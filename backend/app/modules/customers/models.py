@@ -1,0 +1,43 @@
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+
+LEAD_STATUS_VALUES = ("new", "interested", "negotiating", "won", "lost")
+
+
+class Cliente(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
+    __tablename__ = "clientes"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "email", name="uq_clientes__empresa_id_email"),
+        Index("idx_clientes__empresa_id_created_at", "empresa_id", "created_at"),
+        Index("idx_clientes__empresa_id_lead_status_created_at", "empresa_id", "lead_status", "created_at"),
+        Index("idx_clientes__empresa_id_full_name", "empresa_id", "full_name"),
+        CheckConstraint(
+            "lead_status in ('new', 'interested', 'negotiating', 'won', 'lost')",
+            name="ck_clientes__lead_status",
+        ),
+    )
+
+    full_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    whatsapp: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    instagram_username: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String(48)), nullable=False, default=list)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lead_status: Mapped[str] = mapped_column(String(32), nullable=False, default="new")
+    source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    assigned_to: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
