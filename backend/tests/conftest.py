@@ -14,6 +14,8 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security.dependencies import AuthenticatedUser, TenantContext
+from app.conversations.repository import ConversationCoreRepository
+from app.conversations.service import ConversationCoreService
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.service import AuthService
 from app.modules.customers.repository import CustomerRepository
@@ -160,6 +162,20 @@ def conversation_service(
 ) -> ConversationService:
     """ConversationService con repository mockeado."""
     return ConversationService(repository=conversation_repository)
+
+
+@pytest.fixture
+def conversation_core_repository(mock_session: AsyncMock) -> ConversationCoreRepository:
+    """ConversationCoreRepository con session mockeada."""
+    return ConversationCoreRepository(session=mock_session)
+
+
+@pytest.fixture
+def conversation_core_service(
+    conversation_core_repository: ConversationCoreRepository,
+) -> ConversationCoreService:
+    """ConversationCoreService con repository mockeado."""
+    return ConversationCoreService(repository=conversation_core_repository)
 
 
 # ──────────────────────────────────────────────

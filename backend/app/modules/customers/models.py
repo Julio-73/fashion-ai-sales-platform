@@ -1,7 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -18,6 +21,7 @@ class Cliente(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
         Index("idx_clientes__empresa_id_created_at", "empresa_id", "created_at"),
         Index("idx_clientes__empresa_id_lead_status_created_at", "empresa_id", "lead_status", "created_at"),
         Index("idx_clientes__empresa_id_full_name", "empresa_id", "full_name"),
+        Index("idx_clientes__empresa_id_last_interaction_at", "empresa_id", "last_interaction_at"),
         CheckConstraint(
             "lead_status in ('new', 'interested', 'negotiating', 'won', 'lost')",
             name="ck_clientes__lead_status",
@@ -38,6 +42,13 @@ class Cliente(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
         ForeignKey("usuarios.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    last_interaction_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    conversation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_conversation_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("conversations_core.id", ondelete="SET NULL"),
+        nullable=True,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

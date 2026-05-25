@@ -18,6 +18,7 @@ def _make_cliente(**kw):
     defaults = dict(id=uuid4(), empresa_id=TEST_CUSTOMER_ID, full_name="Test",
                     email="t@t.com", phone=None, whatsapp=None, instagram_username=None,
                     tags=[], notes=None, lead_status="new", source=None, assigned_to=None,
+                    last_interaction_at=None, conversation_count=0, last_conversation_id=None,
                     created_at=_now, updated_at=_now, deleted_at=None)
     defaults.update(kw)
     return Cliente(**defaults)

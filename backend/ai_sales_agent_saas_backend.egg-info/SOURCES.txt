@@ -10,6 +10,13 @@ app/api/__init__.py
 app/api/router.py
 app/api/routes/__init__.py
 app/api/routes/health.py
+app/conversations/__init__.py
+app/conversations/dependencies.py
+app/conversations/models.py
+app/conversations/repository.py
+app/conversations/router.py
+app/conversations/schemas.py
+app/conversations/service.py
 app/core/__init__.py
 app/core/config.py
 app/core/errors.py
@@ -82,6 +89,8 @@ app/modules/products/router.py
 app/modules/products/schemas.py
 app/modules/products/service.py
 app/services/__init__.py
+app/services/crm_bridge.py
+app/services/tag_evaluator.py
 app/services/unit_of_work.py
 app/utils/__init__.py
 app/utils/datetime.py

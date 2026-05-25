@@ -1,3 +1,5 @@
+import logging
+
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +15,8 @@ from app.modules.customers.schemas import (
     CustomerUpdateRequest,
     LeadStatus,
 )
+
+logger = logging.getLogger("ai_sales_agent.customers")
 
 
 def _sanitize_tags(tags: list[str]) -> list[str]:
@@ -64,6 +68,10 @@ class CustomerService:
         search: str | None,
         lead_status: LeadStatus | None,
     ) -> CustomerListResponse:
+        logger.info(
+            "list_customers empresa=%s limit=%s offset=%s search=%s lead_status=%s",
+            tenant.empresa_id, limit, offset, search, lead_status,
+        )
         customers, total = await self._repository.list(
             empresa_id=tenant.empresa_id,
             limit=limit,
@@ -71,6 +79,7 @@ class CustomerService:
             search=search,
             lead_status=lead_status,
         )
+        logger.info("list_customers result total=%s returned=%s", total, len(customers))
         return CustomerListResponse(
             items=[CustomerResponse.model_validate(CustomerDTO.model_validate(customer)) for customer in customers],
             total=total,

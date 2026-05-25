@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes.health import router as health_router
+from app.conversations.router import router as conversations_core_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
 from app.modules.chats.router import router as chats_router
@@ -17,5 +18,6 @@ api_router.include_router(customers_router, prefix="/customers", tags=["customer
 api_router.include_router(products_router, prefix="/products", tags=["products"])
 api_router.include_router(chats_router, prefix="/chats", tags=["chats"])
 api_router.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
+api_router.include_router(conversations_core_router, prefix="/conversations-core", tags=["conversations-core"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 

@@ -72,6 +72,9 @@ class CustomerResponse(BaseModel):
     lead_status: LeadStatus
     source: str | None
     assigned_to: UUID | None
+    last_interaction_at: datetime | None = None
+    conversation_count: int = 0
+    last_conversation_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
