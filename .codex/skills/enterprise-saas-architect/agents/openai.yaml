@@ -1,0 +1,4 @@
+interface:
+  display_name: "Enterprise SaaS Architect"
+  short_description: "Principal SaaS architecture standards for AI business platforms"
+  default_prompt: "Use $enterprise-saas-architect to design or review a production-ready multi-tenant AI Sales Agent SaaS architecture."

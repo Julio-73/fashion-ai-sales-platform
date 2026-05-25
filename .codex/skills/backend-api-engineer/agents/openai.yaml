@@ -1,0 +1,5 @@
+interface:
+  display_name: "Backend API Engineer"
+  short_description: "Senior FastAPI standards for SaaS APIs"
+  default_prompt: "Use $backend-api-engineer to design or implement production-ready FastAPI routers, services, repositories, schemas, and dependencies."
+

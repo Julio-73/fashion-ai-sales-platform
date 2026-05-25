@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend SaaS Engineer"
+  short_description: "Premium Next.js SaaS frontend standards"
+  default_prompt: "Use $frontend-saas-engineer to design or implement a premium, responsive, production-ready Next.js SaaS dashboard."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Database Architect"
+  short_description: "Senior PostgreSQL architecture standards for multi-tenant SaaS"
+  default_prompt: "Use $database-architect to design or review a tenant-safe PostgreSQL schema for the AI Sales Agent SaaS."

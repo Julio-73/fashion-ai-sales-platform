@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Engineer"
+  short_description: "Senior SaaS security standards for FastAPI"
+  default_prompt: "Use $security-engineer to design or review secure FastAPI authentication, authorization, tenant isolation, and API protection."

@@ -57,6 +57,14 @@ app/modules/companies/repository.py
 app/modules/companies/router.py
 app/modules/companies/schemas.py
 app/modules/companies/service.py
+app/modules/conversations/__init__.py
+app/modules/conversations/dependencies.py
+app/modules/conversations/dtos.py
+app/modules/conversations/models.py
+app/modules/conversations/repository.py
+app/modules/conversations/router.py
+app/modules/conversations/schemas.py
+app/modules/conversations/service.py
 app/modules/customers/__init__.py
 app/modules/customers/dependencies.py
 app/modules/customers/dtos.py
