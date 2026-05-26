@@ -19,6 +19,7 @@ def _make_cliente(**kw):
                     email="t@t.com", phone=None, whatsapp=None, instagram_username=None,
                     tags=[], notes=None, lead_status="new", source=None, assigned_to=None,
                     last_interaction_at=None, conversation_count=0, last_conversation_id=None,
+                    lead_score=0, priority="cold",
                     created_at=_now, updated_at=_now, deleted_at=None)
     defaults.update(kw)
     return Cliente(**defaults)

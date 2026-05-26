@@ -9,6 +9,7 @@ from app.modules.conversations.router import router as conversations_router
 from app.modules.companies.router import router as companies_router
 from app.modules.customers.router import router as customers_router
 from app.modules.products.router import router as products_router
+from app.sales.api.router import router as sales_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -20,4 +21,5 @@ api_router.include_router(chats_router, prefix="/chats", tags=["chats"])
 api_router.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
 api_router.include_router(conversations_core_router, prefix="/conversations-core", tags=["conversations-core"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(sales_router, prefix="/sales", tags=["sales"])
 

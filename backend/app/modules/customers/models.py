@@ -1,9 +1,6 @@
 from datetime import datetime
 from uuid import UUID
 
-from datetime import datetime
-from uuid import UUID
-
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
@@ -50,5 +47,7 @@ class Cliente(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
         ForeignKey("conversations_core.id", ondelete="SET NULL"),
         nullable=True,
     )
+    lead_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, default="cold", server_default="cold")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -100,6 +100,8 @@ export function ConversationsWorkspace() {
   useEffect(() => {
     if (!accessToken) return;
     let isActive = true;
+    let retried = false;
+
     setIsLoading(true);
     setError(null);
 
@@ -117,8 +119,10 @@ export function ConversationsWorkspace() {
       })
       .catch((err) => {
         if (!isActive) return;
-        if (err instanceof ApiError && err.status === 401) {
-          refreshSession().catch(() => undefined);
+        if (!retried && err instanceof ApiError && err.status === 401) {
+          retried = true;
+          refreshSession();
+          return;
         }
         setError(W.errorLoad);
         setConversations([]);

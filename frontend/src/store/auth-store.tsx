@@ -67,20 +67,16 @@ export function AuthStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshSession = useCallback(async () => {
-    if (!refreshToken) {
+    if (!refreshToken || !user) {
       return;
     }
 
     const session = await authService.refreshToken({ refresh_token: refreshToken });
-    const currentUser = user ?? session.user ?? null;
-    if (!currentUser) {
-      return;
-    }
 
     persistSession({
       accessToken: session.access_token,
       refreshToken: session.refresh_token,
-      user: currentUser
+      user
     });
   }, [persistSession, refreshToken, user]);
 

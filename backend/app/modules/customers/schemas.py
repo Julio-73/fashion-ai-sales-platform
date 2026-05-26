@@ -75,6 +75,8 @@ class CustomerResponse(BaseModel):
     last_interaction_at: datetime | None = None
     conversation_count: int = 0
     last_conversation_id: UUID | None = None
+    lead_score: int = 0
+    priority: str = "cold"
     created_at: datetime
     updated_at: datetime
 

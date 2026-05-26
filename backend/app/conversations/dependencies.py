@@ -7,6 +7,7 @@ from app.conversations.repository import ConversationCoreRepository
 from app.conversations.service import ConversationCoreService
 from app.database.session import get_db_session
 from app.modules.customers.repository import CustomerRepository
+from app.sales.services.sales_intelligence_service import SalesIntelligenceService
 from app.services.crm_bridge import CrmBridgeService
 
 
@@ -22,13 +23,19 @@ async def get_customer_repository(
     return CustomerRepository(session=session)
 
 
+async def get_sales_intelligence_service() -> SalesIntelligenceService:
+    return SalesIntelligenceService()
+
+
 async def get_crm_bridge_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     customer_repository: Annotated[CustomerRepository, Depends(get_customer_repository)],
+    sales_intelligence: Annotated[SalesIntelligenceService, Depends(get_sales_intelligence_service)],
 ) -> CrmBridgeService:
     return CrmBridgeService(
         session=session,
         customer_repository=customer_repository,
+        sales_intelligence=sales_intelligence,
     )
 
 
