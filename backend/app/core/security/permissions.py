@@ -21,6 +21,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "settings:manage",
         "users:manage",
         "sales:read",
+        "ai:classify",
+        "ai:context",
+        "ai:respond",
     },
     "admin": {
         "auth:me",
@@ -35,6 +38,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "analytics:read",
         "settings:manage",
         "sales:read",
+        "ai:classify",
+        "ai:context",
+        "ai:respond",
     },
     "sales_agent": {
         "auth:me",
@@ -46,6 +52,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "conversations:read",
         "conversations:write",
         "sales:read",
+        "ai:classify",
+        "ai:context",
+        "ai:respond",
     },
     "analyst": {
         "auth:me",
