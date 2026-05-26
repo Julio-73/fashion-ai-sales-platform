@@ -222,7 +222,10 @@ class SalesAPIService:
         ]
 
         message_result = await self._session.execute(
-            select(MessageCore.content).limit(500)
+            select(MessageCore.content)
+            .join(ConversationCore, MessageCore.conversation_id == ConversationCore.id)
+            .where(ConversationCore.empresa_id == empresa_id)
+            .limit(500)
         )
         all_messages: list[str] = [row.content for row in message_result if row.content]
         intent_counts: dict[str, int] = {}
