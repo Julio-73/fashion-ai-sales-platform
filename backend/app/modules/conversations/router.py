@@ -7,7 +7,6 @@ from app.core.security.dependencies import TenantContext
 from app.core.security.permissions import require_permission
 from app.modules.conversations.dependencies import get_conversation_service
 from app.modules.conversations.schemas import (
-    ConversationChannel,
     ConversationCreateRequest,
     ConversationDetailResponse,
     ConversationListResponse,

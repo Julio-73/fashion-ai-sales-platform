@@ -306,6 +306,92 @@ export type Locale = {
       draft: string;
     };
   };
+  sales: {
+    page: {
+      eyebrow: string;
+      title: string;
+      description: string;
+    };
+    hero: {
+      hotLeads: string;
+      interested: string;
+      negotiation: string;
+      converted: string;
+      hotLeadsDesc: string;
+      interestedDesc: string;
+      negotiationDesc: string;
+      convertedDesc: string;
+    };
+    topLeads: {
+      title: string;
+      description: string;
+      name: string;
+      score: string;
+      status: string;
+      priority: string;
+      activity: string;
+      lastInteraction: string;
+      probability: string;
+      emptyTitle: string;
+      emptyDesc: string;
+    };
+    recommendations: {
+      title: string;
+      description: string;
+      followUp: string;
+      hotLeads: string;
+      negotiation: string;
+      inactive: string;
+      upsell: string;
+      viewProfile: string;
+      noFollowUp: string;
+      noHotLeads: string;
+      noNegotiation: string;
+      noInactive: string;
+    };
+    intents: {
+      title: string;
+      description: string;
+      purchase: string;
+      pricing: string;
+      negotiation: string;
+      shipping: string;
+      unknown: string;
+      noData: string;
+    };
+    activity: {
+      title: string;
+      description: string;
+      message: string;
+      conversation: string;
+      statusChange: string;
+      noActivity: string;
+      noActivityDesc: string;
+    };
+    profile: {
+      title: string;
+      description: string;
+      summary: string;
+      intents: string;
+      messages: string;
+      conversations: string;
+      salesSummary: string;
+      close: string;
+    };
+    errors: {
+      loadInsights: string;
+      loadLeads: string;
+      loadRecommendations: string;
+      loadActivity: string;
+      loadProfile: string;
+    };
+    loading: {
+      insights: string;
+      leads: string;
+      recommendations: string;
+      activity: string;
+    };
+  };
   common: {
     modal: {
       close: string;

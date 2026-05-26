@@ -1,5 +1,7 @@
 import logging
 import sys
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -14,14 +16,9 @@ logger = logging.getLogger("ai_sales_agent")
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
 
-    register_middleware(app)
-    register_exception_handlers(app)
-    app.include_router(api_router, prefix=settings.api_v1_prefix)
-
-    @app.on_event("startup")
-    async def startup_check():
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         logger.info("Starting %s v0.1.0", settings.app_name)
         logger.info("Environment: %s", settings.app_env)
         if not await check_database_connection():
@@ -29,6 +26,13 @@ def create_app() -> FastAPI:
                 "Continuing startup despite DB connection failure. "
                 "API will return 500 on database-dependent endpoints."
             )
+        yield
+
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+
+    register_middleware(app)
+    register_exception_handlers(app)
+    app.include_router(api_router, prefix=settings.api_v1_prefix)
 
     return app
 
