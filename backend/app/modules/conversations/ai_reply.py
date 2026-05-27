@@ -47,6 +47,7 @@ class AutoReplyGenerator:
         response_text = await self._brain.generate_reply(
             empresa_id=empresa_id,
             user_message=last_user_msg,
+            conversation_id=conversation_id,
         )
         if not response_text:
             return None
