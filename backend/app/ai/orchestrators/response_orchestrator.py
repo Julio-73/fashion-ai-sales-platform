@@ -10,6 +10,7 @@ from app.ai.schemas.ai_schemas import (
     ReplyType,
     SalesAction,
 )
+from app.ai.services.llm_service import LLMService
 
 logger = logging.getLogger("ai_sales_agent.ai.orchestrator")
 
@@ -20,10 +21,12 @@ class AIResponseOrchestrator:
         classifier: IntentClassifierService | None = None,
         context_builder: ConversationContextBuilder | None = None,
         rules_engine: SalesConversationRulesEngine | None = None,
+        llm_service: LLMService | None = None,
     ) -> None:
         self._classifier = classifier or IntentClassifierService()
         self._context_builder = context_builder or ConversationContextBuilder()
         self._rules_engine = rules_engine or SalesConversationRulesEngine()
+        self._llm_service = llm_service
 
     async def orchestrate(self, request: OrchestratorRequest) -> OrchestratorResponse:
         classification = await self._classifier.classify(request.message)
@@ -42,19 +45,26 @@ class AIResponseOrchestrator:
             customer_tags=context.context.customer.tags,
         )
 
-        return self._build_response(
-            classification.intent,
-            classification.confidence,
-            sales_action,
-            context.context.customer.customer_name,
+        return await self._build_response(
+            empresa_id=request.empresa_id,
+            intent=classification.intent,
+            confidence=classification.confidence,
+            sales_action=sales_action,
+            customer_name=context.context.customer.customer_name,
+            context_data=context.context,
+            user_message=request.message,
         )
 
-    def _build_response(
+    async def _build_response(
         self,
+        *,
+        empresa_id,
         intent,
         confidence: float,
         sales_action: SalesAction,
         customer_name: str,
+        context_data,
+        user_message: str,
     ) -> OrchestratorResponse:
         reply_type = ResponseTemplateBuilder.get_reply_type(intent)
         should_reply = reply_type != ReplyType.no_reply
@@ -66,20 +76,28 @@ class AIResponseOrchestrator:
             generated = ResponseTemplateBuilder.ESCALATION_NOTICE
             escalate_reason = f"Escalado por acción: {sales_action.value}, intent: {intent.value}"
             reply_type = ReplyType.escalation
-        elif sales_action == SalesAction.follow_up:
-            generated = ResponseTemplateBuilder.build_follow_up(customer_name)
-            reply_type = ReplyType.follow_up
         elif sales_action == SalesAction.suggest_discount:
-            generated = ResponseTemplateBuilder.build_sales_response(intent)
             discount_pct = 10.0
-        elif sales_action == SalesAction.suggest_cross_sell:
-            generated = ResponseTemplateBuilder.build_cross_sell()
-        elif reply_type == ReplyType.support:
-            generated = ResponseTemplateBuilder.build_support_response(intent)
-        elif reply_type == ReplyType.sales:
-            generated = ResponseTemplateBuilder.build_sales_response(intent)
-        elif reply_type == ReplyType.greeting:
-            generated = ResponseTemplateBuilder.build_sales_response(intent)
+
+        if not generated and self._llm_service and self._llm_service.is_configured:
+            generated = await self._llm_service.generate_response(
+                empresa_id=empresa_id,
+                intent=intent,
+                sales_action=sales_action,
+                context=context_data,
+                user_message=user_message,
+            )
+
+        if not generated:
+            if sales_action == SalesAction.follow_up:
+                generated = ResponseTemplateBuilder.build_follow_up(customer_name)
+                reply_type = ReplyType.follow_up
+            elif sales_action == SalesAction.suggest_cross_sell:
+                generated = ResponseTemplateBuilder.build_cross_sell()
+            elif reply_type == ReplyType.support:
+                generated = ResponseTemplateBuilder.build_support_response(intent)
+            elif reply_type in (ReplyType.sales, ReplyType.greeting):
+                generated = ResponseTemplateBuilder.build_sales_response(intent)
 
         return OrchestratorResponse(
             intent=intent,

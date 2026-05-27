@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_max_tokens: int = 512
+    openai_temperature: float = 0.7
+    openai_timeout_seconds: int = 30
+    openai_max_retries: int = 2
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",

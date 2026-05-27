@@ -12,19 +12,22 @@ from app.ai.schemas.ai_schemas import (
     OrchestratorRequest,
     OrchestratorResponse,
 )
+from app.ai.services.llm_service import LLMService
 
 logger = logging.getLogger("ai_sales_agent.ai.service")
 
 
 class AIService:
-    def __init__(self) -> None:
+    def __init__(self, llm_service: LLMService | None = None) -> None:
         self._classifier = IntentClassifierService()
         self._context_builder = ConversationContextBuilder()
         self._rules_engine = SalesConversationRulesEngine()
+        self._llm_service = llm_service
         self._orchestrator = AIResponseOrchestrator(
             classifier=self._classifier,
             context_builder=self._context_builder,
             rules_engine=self._rules_engine,
+            llm_service=self._llm_service,
         )
 
     async def classify(self, request: ClassifyRequest) -> ClassifyResponse:
