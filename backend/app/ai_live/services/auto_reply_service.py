@@ -3,9 +3,6 @@ from uuid import UUID
 
 from app.ai_live.repository import ConversationAIRepository
 from app.conversations.models import MessageCore
-from app.conversations.repository import ConversationCoreRepository
-from app.conversations.schemas import MessageCoreCreateRequest
-from app.modules.conversations.schemas import MessageCreateRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("ai_sales_agent.ai_live.auto_reply")
