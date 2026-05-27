@@ -23,6 +23,7 @@ import {
   getConversationDetail,
   listConversations,
 } from "@/modules/conversations/services/conversations-api";
+import { AISidebar } from "@/modules/conversations/components/ai-live/ai-sidebar";
 import { useAuthStore } from "@/store/auth-store";
 import type {
   ConversationDetail,
@@ -212,9 +213,17 @@ export function ConversationsWorkspace() {
     ),
   }));
 
+  const gridCols = selected
+    ? "xl:grid-cols-[minmax(0,1fr)_480px_280px]"
+    : "xl:grid-cols-[minmax(0,1fr)_480px]";
+
+  function handleSelectSuggestedReply(text: string) {
+    setNewMessage(text);
+  }
+
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_480px]">
+      <div className={`grid gap-6 ${gridCols}`}>
         <div className="grid gap-5">
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_auto]">
@@ -443,6 +452,16 @@ export function ConversationsWorkspace() {
               icon={MessageSquare}
               title={W.selectChat}
               description={W.selectChatDesc}
+            />
+          </div>
+        )}
+
+        {/* AI Sidebar */}
+        {selected && (
+          <div className="hidden xl:block">
+            <AISidebar
+              conversationId={selected.id}
+              onSelectSuggestedReply={handleSelectSuggestedReply}
             />
           </div>
         )}

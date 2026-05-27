@@ -886,7 +886,7 @@ async def seed() -> None:
 
             demo_user = Usuario(
                 email="demo@fashionsales.ai",
-                password_hash="$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5GzG5q7dY1eV3kJq1YGeF7Oe",
+                password_hash="$2b$12$pUqeFLpZGsg8BQN.rPXNCeYat192.JqvQuOxnlks3Dy4HWM2l6uPK",
                 estado="active",
             )
             session.add(demo_user)

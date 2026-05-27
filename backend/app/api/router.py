@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.ai.router import router as ai_router
+from app.ai_live.router import router as ai_live_router
 from app.api.routes.health import router as health_router
 from app.conversations.router import router as conversations_core_router
 from app.modules.analytics.router import router as analytics_router
@@ -24,4 +25,5 @@ api_router.include_router(conversations_core_router, prefix="/conversations-core
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(sales_router, prefix="/sales", tags=["sales"])
 api_router.include_router(ai_router, prefix="/ai", tags=["ai"])
+api_router.include_router(ai_live_router, prefix="/ai-live", tags=["ai-live"])
 
