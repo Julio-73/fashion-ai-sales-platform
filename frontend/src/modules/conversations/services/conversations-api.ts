@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/services/api-client";
 import type {
+  AddMessageCoreResponse,
   ConversationCreatePayload,
   ConversationDetail,
   ConversationListResponse,
@@ -68,5 +69,24 @@ export function addMessage(
 ): Promise<MessageSummary> {
   return apiPost<MessageSummary, MessageCreatePayload>(
     `/conversations/${conversationId}/messages`, payload, { accessToken },
+  );
+}
+
+export function addMessageCore(
+  accessToken: string,
+  conversationId: string,
+  payload: MessageCreatePayload,
+): Promise<AddMessageCoreResponse> {
+  return apiPost<AddMessageCoreResponse, MessageCreatePayload>(
+    `/conversations-core/${conversationId}/messages`, payload, { accessToken },
+  );
+}
+
+export function generateAiReply(
+  accessToken: string,
+  conversationId: string,
+): Promise<MessageSummary> {
+  return apiPost<MessageSummary, Record<string, never>>(
+    `/conversations/${conversationId}/ai-reply`, {}, { accessToken },
   );
 }

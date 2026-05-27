@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.conversations.dependencies import get_conversation_core_service
 from app.conversations.schemas import (
+    AddMessageCoreResponse,
     ConversationCoreCreateRequest,
     ConversationCoreDetailResponse,
     ConversationCoreListResponse,
     ConversationCoreResponse,
     MessageCoreCreateRequest,
     MessageCoreListResponse,
-    MessageCoreResponse,
 )
 from app.conversations.service import ConversationCoreService
 from app.core.security.dependencies import TenantContext
@@ -56,13 +56,13 @@ async def get_conversation(
     return await service.get_conversation(tenant=tenant, conversation_id=conversation_id)
 
 
-@router.post("/{conversation_id}/messages", response_model=MessageCoreResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{conversation_id}/messages", response_model=AddMessageCoreResponse, status_code=status.HTTP_201_CREATED)
 async def add_message(
     conversation_id: UUID,
     payload: MessageCoreCreateRequest,
     tenant: Annotated[TenantContext, Depends(require_permission("conversations:write"))],
     service: Annotated[ConversationCoreService, Depends(get_conversation_core_service)],
-) -> MessageCoreResponse:
+) -> AddMessageCoreResponse:
     return await service.add_message(tenant=tenant, conversation_id=conversation_id, payload=payload)
 
 

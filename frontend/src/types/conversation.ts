@@ -55,3 +55,8 @@ export type MessageCreatePayload = {
   sender_name?: string | null;
   extra_data?: Record<string, unknown> | null;
 };
+
+export type AddMessageCoreResponse = {
+  message: MessageSummary;
+  ai_reply: MessageSummary | null;
+};

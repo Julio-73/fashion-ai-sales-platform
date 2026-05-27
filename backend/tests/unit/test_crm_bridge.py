@@ -370,6 +370,6 @@ class TestIntegrationWithConversationService:
             payload=MessageCoreCreateRequest(sender="user", content="Hello"),
         )
 
-        assert result.content == "Hello"
+        assert result.message.content == "Hello"
         assert cliente.last_interaction_at is not None
         assert cliente.last_conversation_id == TEST_CONVERSATION_ID

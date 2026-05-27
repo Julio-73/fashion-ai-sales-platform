@@ -3,6 +3,9 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai_live.dependencies import get_ai_live_repository
+from app.ai_live.repository import ConversationAIRepository
+from app.ai_live.services.auto_reply_service import AIReplyService
 from app.conversations.repository import ConversationCoreRepository
 from app.conversations.service import ConversationCoreService
 from app.database.session import get_db_session
@@ -39,8 +42,16 @@ async def get_crm_bridge_service(
     )
 
 
+async def get_ai_reply_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    ai_live_repo: Annotated[ConversationAIRepository, Depends(get_ai_live_repository)],
+) -> AIReplyService:
+    return AIReplyService(session=session, ai_live_repo=ai_live_repo)
+
+
 async def get_conversation_core_service(
     repository: Annotated[ConversationCoreRepository, Depends(get_conversation_core_repository)],
     crm_bridge: Annotated[CrmBridgeService, Depends(get_crm_bridge_service)],
+    ai_reply_service: Annotated[AIReplyService, Depends(get_ai_reply_service)],
 ) -> ConversationCoreService:
-    return ConversationCoreService(repository=repository, crm_bridge=crm_bridge)
+    return ConversationCoreService(repository=repository, crm_bridge=crm_bridge, ai_reply_service=ai_reply_service)

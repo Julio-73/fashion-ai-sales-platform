@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.conversations.models import ConversationCore
 from app.conversations.schemas import (
+    AddMessageCoreResponse,
     ConversationCoreCreateRequest,
     ConversationCoreDetailResponse,
     ConversationCoreListResponse,
@@ -23,9 +24,11 @@ class ConversationCoreService:
         self,
         repository: ConversationCoreRepository,
         crm_bridge: CrmBridgeService | None = None,
+        ai_reply_service=None,
     ) -> None:
         self._repository = repository
         self._crm_bridge = crm_bridge
+        self._ai_reply_service = ai_reply_service
 
     async def create_conversation(
         self,
@@ -131,7 +134,7 @@ class ConversationCoreService:
         tenant: TenantContext,
         conversation_id: UUID,
         payload: MessageCoreCreateRequest,
-    ) -> MessageCoreResponse:
+    ) -> AddMessageCoreResponse:
         conversation = await self._get_conversation_or_404(
             empresa_id=tenant.empresa_id, conversation_id=conversation_id
         )
@@ -156,8 +159,32 @@ class ConversationCoreService:
             if sync_result.should_reactivate:
                 conversation.status = "active"
 
+        ai_reply = None
+        if self._ai_reply_service and payload.sender in ("user", "client"):
+            should = await self._ai_reply_service.should_auto_reply(
+                empresa_id=tenant.empresa_id,
+                conversation_id=conversation.id,
+                sender=payload.sender,
+                status=conversation.status,
+            )
+            if should:
+                ai_msg = await self._ai_reply_service.generate_and_save_ai_reply(
+                    empresa_id=tenant.empresa_id,
+                    conversation_id=conversation.id,
+                    user_message=payload.content,
+                )
+                if ai_msg:
+                    ai_reply = MessageCoreResponse.model_validate(ai_msg)
+                    if ai_msg.content:
+                        await self._repository.update_last_message(
+                            conversation=conversation, content=ai_msg.content
+                        )
+
         await self._repository.commit()
-        return MessageCoreResponse.model_validate(message)
+        return AddMessageCoreResponse(
+            message=MessageCoreResponse.model_validate(message),
+            ai_reply=ai_reply,
+        )
 
     async def list_messages(
         self,

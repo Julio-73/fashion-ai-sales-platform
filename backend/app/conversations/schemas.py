@@ -62,3 +62,8 @@ class MessageCoreListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AddMessageCoreResponse(BaseModel):
+    message: MessageCoreResponse
+    ai_reply: MessageCoreResponse | None = None

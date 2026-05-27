@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Bot,
   MessageSquare,
   Plus,
   Search,
@@ -20,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/services/api-client";
 import {
   addMessage,
+  generateAiReply,
   getConversationDetail,
   listConversations,
 } from "@/modules/conversations/services/conversations-api";
@@ -52,30 +54,54 @@ const canalIcon: Record<string, string> = {
 function MessageBubble({ message }: { message: MessageSummary }) {
   const isAgent = message.role === "agent";
   const isSystem = message.role === "system";
+  const isAi = isAgent && message.sender_name === "AI Asistente";
   return (
     <div className={`flex ${isAgent ? "justify-end" : "justify-start"} mb-3`}>
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isSystem
             ? "bg-muted text-muted-foreground italic"
-            : isAgent
-              ? "bg-primary text-primary-foreground rounded-br-sm"
-              : "bg-secondary text-secondary-foreground rounded-bl-sm"
+            : isAi
+              ? "bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-bl-sm"
+              : isAgent
+                ? "bg-primary text-primary-foreground rounded-br-sm"
+                : "bg-secondary text-secondary-foreground rounded-bl-sm"
         }`}
       >
         {message.sender_name && !isSystem ? (
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide opacity-70">
+          <p className={`mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide ${
+            isAi ? "text-indigo-500" : "opacity-70"
+          }`}>
+            {isAi ? <Bot className="h-3 w-3" /> : null}
             {message.sender_name}
           </p>
         ) : null}
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
-        <p className="mt-1 text-right text-[10px] opacity-60">
+        <p className={`mt-1 text-right text-[10px] ${isAi ? "text-indigo-400" : "opacity-60"}`}>
           {new Date(message.created_at).toLocaleString("es-PE", {
             day: "numeric",
             month: "short",
             hour: "2-digit",
             minute: "2-digit",
           })}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AiTypingBubble() {
+  return (
+    <div className="flex justify-start mb-3">
+      <div className="max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 text-sm bg-indigo-50 text-indigo-400 border border-indigo-200">
+        <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-500">
+          <Bot className="h-3 w-3" />
+          AI Asistente
+        </p>
+        <p className="flex items-center gap-1">
+          <span className="animate-pulse">●</span>
+          <span className="animate-pulse animation-delay-200">●</span>
+          <span className="animate-pulse animation-delay-400">●</span>
         </p>
       </div>
     </div>
@@ -94,6 +120,7 @@ export function ConversationsWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const limit = 10;
@@ -162,15 +189,26 @@ export function ConversationsWorkspace() {
         content,
         sender_name: "Tú",
       });
-      setSelected({
-        ...selected,
-        messages: [...selected.messages, msg],
+      setSelected((prev) => {
+        if (!prev) return prev;
+        return { ...prev, messages: [...prev.messages, msg] };
       });
       setNewMessage("");
+      setIsAiTyping(true);
+      try {
+        const aiReply = await generateAiReply(accessToken, selected.id);
+        setSelected((prev) => {
+          if (!prev) return prev;
+          return { ...prev, messages: [...prev.messages, aiReply] };
+        });
+      } catch {
+        // AI reply is optional; non-blocking
+      }
     } catch {
       setError(W.sendError);
     } finally {
       setIsSending(false);
+      setIsAiTyping(false);
     }
   }
 
@@ -412,6 +450,7 @@ export function ConversationsWorkspace() {
                   ))}
                 </AnimatePresence>
               )}
+              {isAiTyping ? <AiTypingBubble /> : null}
               <div ref={messagesEndRef} />
             </div>
 

@@ -35,16 +35,15 @@ class AISuggestionsService:
             from app.database.session import get_db_session
             from app.modules.conversations.repository import ConversationRepository as ConvRepo
 
-            session = await anext(get_db_session())
-            try:
+            async for session in get_db_session():
                 conv_repo = ConvRepo(session=session)
-                conversation = await conv_repo.get_by_id(
+                conversation = await conv_repo.get_conversation_by_id(
                     empresa_id=empresa_id, conversation_id=conversation_id
                 )
                 if not conversation:
                     return self._fallback_suggestions()
-                messages = await conv_repo.list_messages(
-                    empresa_id=empresa_id, conversation_id=conversation_id
+                messages, _ = await conv_repo.list_messages(
+                    empresa_id=empresa_id, conversation_id=conversation_id, limit=100, offset=0
                 )
                 conversation_detail = ConversationDetailResponse(
                     id=conversation.id,
@@ -56,10 +55,9 @@ class AISuggestionsService:
                     deleted_at=conversation.deleted_at,
                     created_at=conversation.created_at,
                     updated_at=conversation.updated_at,
-                    messages=[m async for m in messages],
+                    messages=list(messages),
                 )
-            finally:
-                await session.close()
+                break
 
         last_messages = [m.content for m in conversation_detail.messages[-5:]]
         last_user_msg = last_messages[-1] if last_messages else ""

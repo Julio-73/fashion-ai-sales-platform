@@ -111,8 +111,8 @@ class TestAddMessage:
         result = await conversation_core_service.add_message(
             tenant=tenant_context, conversation_id=TEST_CONVERSATION_ID,
             payload=MessageCoreCreateRequest(sender="user", content="Hello"))
-        assert result.sender == "user"
-        assert result.content == "Hello"
+        assert result.message.sender == "user"
+        assert result.message.content == "Hello"
         conversation_core_repository.update_last_message.assert_called_once_with(
             conversation=mock_c, content="Hello")
 
