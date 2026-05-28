@@ -15,3 +15,9 @@ Contexto:
 - Lead score: {lead_score}
 - Ofertas disponibles: {available_offers}
 - Días sin contacto: {days_since_contact}
+- Cliente VIP: {customer_vip_status}
+- Colores preferidos: {preferred_colors}
+- Tallas preferidas: {preferred_sizes}
+- Historial de compras: {purchase_history}
+- Probabilidad de conversión: {conversion_probability}
+- Riesgo de abandono: {churn_risk}

@@ -15,3 +15,8 @@ Contexto:
 - Productos sugeridos: {suggested_products}
 - Lead score: {lead_score}
 - Historial de compras: {purchase_history}
+- Cliente VIP: {customer_vip_status}
+- Colores preferidos: {preferred_colors}
+- Tallas preferidas: {preferred_sizes}
+- Estilos preferidos: {preferred_styles}
+- Probabilidad de conversión: {conversion_probability}

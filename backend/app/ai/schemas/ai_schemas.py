@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -72,6 +74,88 @@ class CustomerProfileRef(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class RichCustomerProfile(BaseModel):
+    customer_id: UUID
+    full_name: str
+    email: str | None = None
+    phone: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    lead_score: float = 0.0
+    lead_status: str = "new"
+    priority: str = "cold"
+    total_conversations: int = 0
+    last_interaction_at: datetime | None = None
+    favorite_categories: list[str] = Field(default_factory=list)
+    preferred_colors: list[str] = Field(default_factory=list)
+    preferred_sizes: list[str] = Field(default_factory=list)
+    average_order_value: float = 0.0
+    customer_lifetime_value: float = 0.0
+    is_vip: bool = False
+    detected_preferences: dict[str, str] = Field(default_factory=dict)
+
+
+class MessageHistoryItem(BaseModel):
+    role: str = ""
+    content: str = ""
+    created_at: datetime | None = None
+    intent: str | None = None
+    sentiment: str | None = None
+
+
+class ConversationHistory(BaseModel):
+    conversation_id: UUID | None = None
+    messages: list[MessageHistoryItem] = Field(default_factory=list)
+    detected_intents: list[str] = Field(default_factory=list)
+    sentiment_history: list[str] = Field(default_factory=list)
+    has_escalations: bool = False
+    has_handoffs: bool = False
+    average_response_time_minutes: float = 0.0
+    total_messages: int = 0
+    status: str = "active"
+
+
+class ProductInterest(BaseModel):
+    product_id: UUID | None = None
+    product_name: str = ""
+    category: str = ""
+    viewed_count: int = 0
+    asked_count: int = 0
+    stock_available: int = 0
+    has_stock: bool = False
+    price: float = 0.0
+
+
+class ProductContextDetail(BaseModel):
+    products_viewed: list[ProductInterest] = Field(default_factory=list)
+    products_asked: list[ProductInterest] = Field(default_factory=list)
+    frequent_categories: list[str] = Field(default_factory=list)
+    preferred_styles: list[str] = Field(default_factory=list)
+    upsell_candidates: list[ProductInterest] = Field(default_factory=list)
+    total_products_queried: int = 0
+
+
+class SalesContextDetail(BaseModel):
+    conversion_probability: str = "low"
+    negotiation_stage: str = "initial"
+    discount_sensitivity: str = "unknown"
+    buying_intent_trend: str = "stable"
+    lead_score_evolution: list[dict] = Field(default_factory=list)
+    churn_risk: str = "low"
+    is_hot_lead: bool = False
+    is_premium_customer: bool = False
+
+
+class RichContextData(BaseModel):
+    customer: RichCustomerProfile
+    conversation: ConversationHistory = Field(default_factory=ConversationHistory)
+    products: ProductContextDetail = Field(default_factory=ProductContextDetail)
+    sales: SalesContextDetail = Field(default_factory=SalesContextDetail)
+
+
+class RichContextResponse(BaseModel):
+    context: RichContextData
+
+
 class ContextData(BaseModel):
     customer: CustomerProfileRef
     recent_messages: list[str] = Field(default_factory=list)
@@ -100,3 +184,4 @@ class OrchestratorResponse(BaseModel):
     recommended_product_ids: list[UUID] = Field(default_factory=list)
     suggested_discount_pct: float | None = None
     escalate_reason: str | None = None
+    rich_context: RichContextData | None = None

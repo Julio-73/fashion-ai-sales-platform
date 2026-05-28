@@ -5,6 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers.openai_provider import OpenAIProvider
 from app.smart_sales.entity_extractor import EntityExtractor
+from app.smart_sales.conversational_closer.conversational_closer_engine import (
+    ConversationalCloserEngine, CloserInput,
+)
+from app.smart_sales.human_sales.human_sales_engine import (
+    HumanSalesPsychologyEngine, HumanSalesInput,
+)
+from app.smart_sales.conversational_router.conversational_router_engine import (
+    ConversationalRouterEngine,
+)
 from app.smart_sales.humanization.follow_up_engine import FollowUpEngine
 from app.smart_sales.humanization.response_humanizer import ResponseHumanizer
 from app.smart_sales.humanization.style_system import StyleSystem
@@ -41,6 +50,9 @@ class SmartSalesBrain:
         self._humanizer = ResponseHumanizer()
         self._style_system = StyleSystem()
         self._follow_up_engine = FollowUpEngine()
+        self._human_sales = HumanSalesPsychologyEngine()
+        self._conversational_closer = ConversationalCloserEngine()
+        self._conversational_router = ConversationalRouterEngine()
         self._sales_responder = SalesResponder(
             recommendation_engine=self._recommendation_engine,
             advanced_recommender=self._advanced_recommender,
@@ -61,6 +73,14 @@ class SmartSalesBrain:
         if conversation_id:
             memory_ctx = self._memory_manager.get_or_create(conversation_id)
             memory_ctx.update_from_message(user_message)
+
+        router_result = self._conversational_router.process(
+            message=user_message,
+            conversation_id=str(conversation_id) if conversation_id else None,
+        )
+        if router_result.handled:
+            logger.info("Conversational router handled message as %s (conf=%.2f)", router_result.intent.value, router_result.confidence)
+            return router_result.response
 
         entities = self._entity_extractor.extract(user_message)
         entities_dict = {
@@ -116,26 +136,91 @@ class SmartSalesBrain:
         )
 
         if confidence.should_recommend_directly() and self._provider.is_configured and matched:
-            return await self._generate_llm_reply(
+            response = await self._generate_llm_reply(
                 empresa_id=empresa_id,
                 user_message=user_message,
                 entities_dict=entities_dict,
                 matched_products=matched,
                 memory_ctx=memory_ctx,
             )
+        else:
+            response = await self._sales_responder.generate_response(
+                empresa_id=empresa_id,
+                user_message=user_message,
+                entities=entities,
+                matched_products=matched,
+                memory_ctx=memory_ctx,
+            )
 
-        response = await self._sales_responder.generate_response(
-            empresa_id=empresa_id,
+            if memory_ctx and confidence.should_ask_before_recommend():
+                memory_ctx.follow_up_count += 1
+
+        response = await self._apply_human_sales_layer(
             user_message=user_message,
-            entities=entities,
-            matched_products=matched,
-            memory_ctx=memory_ctx,
+            response=response,
+            entities_dict=entities_dict,
+            matched=matched,
+            conversation_id=str(conversation_id) if conversation_id else "",
         )
 
-        if memory_ctx and confidence.should_ask_before_recommend():
-            memory_ctx.follow_up_count += 1
-
         return response
+
+    async def _apply_human_sales_layer(
+        self,
+        *,
+        user_message: str,
+        response: str,
+        entities_dict: dict,
+        matched: list,
+        conversation_id: str,
+    ) -> str:
+        try:
+            top_product = matched[0] if matched else None
+            total_stock = top_product.total_available_stock if top_product and hasattr(top_product, "total_available_stock") else 0
+
+            input_data = HumanSalesInput(
+                user_message=user_message,
+                conversation_id=conversation_id,
+                product_name=top_product.name if top_product else "",
+                product_category=top_product.category if top_product else "",
+                product_style=entities_dict.get("style", ""),
+                product_color=entities_dict.get("color", ""),
+                product_occasion=entities_dict.get("occasion", ""),
+                product_gender=entities_dict.get("gender", ""),
+                product_size=entities_dict.get("size", ""),
+                total_stock=total_stock,
+                response=response,
+            )
+
+            # V3 — Human Sales Psychology
+            v3_output = await self._human_sales.process(input_data=input_data)
+
+            # V4 — Conversational Closer
+            closer_input = CloserInput(
+                user_message=user_message,
+                conversation_id=conversation_id,
+                response=v3_output.enhanced_response,
+                product_name=input_data.product_name,
+                product_category=input_data.product_category,
+                product_color=input_data.product_color,
+                product_size=input_data.product_size,
+                product_style=input_data.product_style,
+                product_occasion=input_data.product_occasion,
+                product_gender=input_data.product_gender,
+                total_stock=input_data.total_stock,
+                available_sizes=top_product.available_sizes if top_product and hasattr(top_product, "available_sizes") else [],
+                available_colors=top_product.available_colors if top_product and hasattr(top_product, "available_colors") else [],
+                emotional_state=v3_output.emotional.state.value if v3_output.emotional else "",
+                sales_stage=v3_output.current_stage.value if v3_output.current_stage else "",
+                has_product_history=bool(matched),
+                confidence_level=v3_output.emotional.state.value if v3_output.emotional else "",
+            )
+
+            v4_output = await self._conversational_closer.process(input_data=closer_input)
+            return v4_output.response
+        except Exception:
+            logger.warning("Human sales layer failed, returning original response", exc_info=True)
+            return response
 
     async def _generate_llm_reply(
         self,

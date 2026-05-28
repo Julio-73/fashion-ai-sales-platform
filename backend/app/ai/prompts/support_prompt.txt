@@ -5,6 +5,9 @@ Contexto:
 - Problema reportado: {issue_description}
 - Historial: {conversation_history}
 - Tipo de solicitud: {request_type} (devolución, cambio, reclamo, duda)
+- Tags del cliente: {customer_tags}
+- Cliente VIP: {customer_vip_status}
+- Historial de compras: {purchase_history}
 
 Objetivo: Resolver la solicitud de soporte del cliente de manera eficiente y empática.
 

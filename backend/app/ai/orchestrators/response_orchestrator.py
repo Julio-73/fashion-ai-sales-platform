@@ -8,6 +8,7 @@ from app.ai.schemas.ai_schemas import (
     OrchestratorRequest,
     OrchestratorResponse,
     ReplyType,
+    RichContextData,
     SalesAction,
 )
 from app.ai.services.llm_service import LLMService
@@ -28,7 +29,11 @@ class AIResponseOrchestrator:
         self._rules_engine = rules_engine or SalesConversationRulesEngine()
         self._llm_service = llm_service
 
-    async def orchestrate(self, request: OrchestratorRequest) -> OrchestratorResponse:
+    async def orchestrate(
+        self,
+        request: OrchestratorRequest,
+        rich_context: RichContextData | None = None,
+    ) -> OrchestratorResponse:
         classification = await self._classifier.classify(request.message)
         context = await self._context_builder.build(
             empresa_id=request.empresa_id,
@@ -53,6 +58,7 @@ class AIResponseOrchestrator:
             customer_name=context.context.customer.customer_name,
             context_data=context.context,
             user_message=request.message,
+            rich_context=rich_context,
         )
 
     async def _build_response(
@@ -65,6 +71,7 @@ class AIResponseOrchestrator:
         customer_name: str,
         context_data,
         user_message: str,
+        rich_context: RichContextData | None = None,
     ) -> OrchestratorResponse:
         reply_type = ResponseTemplateBuilder.get_reply_type(intent)
         should_reply = reply_type != ReplyType.no_reply
@@ -80,11 +87,14 @@ class AIResponseOrchestrator:
             discount_pct = 10.0
 
         if not generated and self._llm_service and self._llm_service.is_configured:
+            llm_context = context_data
+            if rich_context:
+                llm_context = rich_context
             generated = await self._llm_service.generate_response(
                 empresa_id=empresa_id,
                 intent=intent,
                 sales_action=sales_action,
-                context=context_data,
+                context=llm_context,
                 user_message=user_message,
             )
 
@@ -108,4 +118,5 @@ class AIResponseOrchestrator:
             generated_response=generated,
             suggested_discount_pct=discount_pct,
             escalate_reason=escalate_reason,
+            rich_context=rich_context,
         )
