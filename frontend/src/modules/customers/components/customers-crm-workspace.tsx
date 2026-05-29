@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Search, SlidersHorizontal, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { t } from "@/lib/i18n";
 import { DataTable } from "@/components/data-table/data-table";
@@ -35,47 +35,54 @@ export function CustomersCrmWorkspace() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const limit = 10;
+  const activeRef = useRef(true);
 
   useEffect(() => {
     if (!accessToken) return;
-    let isActive = true;
-    let retried = false;
+    activeRef.current = true;
 
-    setIsLoading(true);
-    setError(null);
-
-    listCustomers({
-      accessToken,
-      search: search || undefined,
-      leadStatus,
-      limit,
-      offset
-    })
-      .then((response) => {
-        if (!isActive) return;
-        setCustomers(response.items);
-        setTotal(response.total);
-        setSelectedCustomer((current) => current ?? response.items[0] ?? null);
-      })
-      .catch((err) => {
-        if (!isActive) return;
-        if (!retried && err instanceof ApiError && err.status === 401) {
-          retried = true;
-          refreshSession();
-          return;
-        }
-        setError(W.errorLoad);
-        setCustomers([]);
-        setTotal(0);
-      })
-      .finally(() => {
-        if (isActive) setIsLoading(false);
-      });
+    loadCustomers();
 
     return () => {
-      isActive = false;
+      activeRef.current = false;
     };
   }, [accessToken, leadStatus, offset, search]);
+
+  async function loadCustomers(retried = false) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await listCustomers({
+        accessToken: accessToken!,
+        search: search || undefined,
+        leadStatus,
+        limit,
+        offset,
+      });
+      if (!activeRef.current) return;
+      setCustomers(response.items);
+      setTotal(response.total);
+      setSelectedCustomer((current) => current ?? response.items[0] ?? null);
+    } catch (err) {
+      if (!activeRef.current) return;
+      if (!retried && err instanceof ApiError && err.status === 401) {
+        try {
+          await refreshSession();
+        } catch {
+          setError(W.errorLoad);
+          setCustomers([]);
+          setTotal(0);
+          return;
+        }
+        return loadCustomers(true);
+      }
+      setError(W.errorLoad);
+      setCustomers([]);
+      setTotal(0);
+    } finally {
+      if (activeRef.current) setIsLoading(false);
+    }
+  }
 
   const tableRows = useMemo(
     () =>

@@ -126,46 +126,53 @@ export function ConversationsWorkspace() {
   const typingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const limit = 10;
+  const activeRef = useRef(true);
 
   useEffect(() => {
     if (!accessToken) return;
-    let isActive = true;
-    let retried = false;
+    activeRef.current = true;
 
-    setIsLoading(true);
-    setError(null);
-
-    listConversations({
-      accessToken,
-      search: search || undefined,
-      estado,
-      limit,
-      offset,
-    })
-      .then((response) => {
-        if (!isActive) return;
-        setConversations(response.items);
-        setTotal(response.total);
-      })
-      .catch((err) => {
-        if (!isActive) return;
-        if (!retried && err instanceof ApiError && err.status === 401) {
-          retried = true;
-          refreshSession();
-          return;
-        }
-        setError(W.errorLoad);
-        setConversations([]);
-        setTotal(0);
-      })
-      .finally(() => {
-        if (isActive) setIsLoading(false);
-      });
+    loadConversations();
 
     return () => {
-      isActive = false;
+      activeRef.current = false;
     };
   }, [accessToken, estado, offset, search, refreshKey]);
+
+  async function loadConversations(retried = false) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await listConversations({
+        accessToken: accessToken!,
+        search: search || undefined,
+        estado,
+        limit,
+        offset,
+      });
+      if (!activeRef.current) return;
+      setConversations(response.items);
+      setTotal(response.total);
+    } catch (err) {
+      if (!activeRef.current) return;
+      if (!retried && err instanceof ApiError && err.status === 401) {
+        try {
+          await refreshSession();
+        } catch {
+          setError(W.errorLoad);
+          setConversations([]);
+          setTotal(0);
+          return;
+        }
+        return loadConversations(true);
+      }
+      setError(W.errorLoad);
+      setConversations([]);
+      setTotal(0);
+    } finally {
+      if (activeRef.current) setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

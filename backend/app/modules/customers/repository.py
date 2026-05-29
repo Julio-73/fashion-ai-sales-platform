@@ -56,6 +56,7 @@ class CustomerRepository:
         values = payload.model_dump(exclude_unset=True) if not isinstance(payload, dict) else payload
         for field, value in values.items():
             setattr(customer, field, value)
+        customer.updated_at = datetime.now(UTC)
         await self._session.flush()
         return customer
 

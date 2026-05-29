@@ -97,7 +97,10 @@ class ConversationService:
             conversation=conversation, payload=payload
         )
         await self._repository.commit()
-        return ConversationResponse.model_validate(ConversationDTO.model_validate(updated))
+        response = ConversationResponse.model_validate(
+            ConversationDTO.model_validate(updated)
+        )
+        return response
 
     async def delete_conversation(
         self,
