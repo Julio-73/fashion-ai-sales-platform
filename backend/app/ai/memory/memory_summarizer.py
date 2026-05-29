@@ -1,9 +1,5 @@
 import logging
-from uuid import UUID
 
-from app.ai.context.repositories.conversation_context_repository import (
-    ConversationContextRepository,
-)
 from app.smart_sales.entity_extractor import EntityExtractor
 from app.smart_sales.product_matcher import ProductMatcher
 

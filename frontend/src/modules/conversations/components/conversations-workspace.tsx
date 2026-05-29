@@ -20,10 +20,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/services/api-client";
 import {
-  addMessage,
-  generateAiReply,
   getConversationDetail,
+  getTypingState,
   listConversations,
+  processMessage,
 } from "@/modules/conversations/services/conversations-api";
 import { AISidebar } from "@/modules/conversations/components/ai-live/ai-sidebar";
 import { useAuthStore } from "@/store/auth-store";
@@ -118,10 +118,12 @@ export function ConversationsWorkspace() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const limit = 10;
 
@@ -163,11 +165,43 @@ export function ConversationsWorkspace() {
     return () => {
       isActive = false;
     };
-  }, [accessToken, estado, offset, search]);
+  }, [accessToken, estado, offset, search, refreshKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selected?.messages]);
+  }, [selected?.messages, isAiTyping]);
+
+  useEffect(() => {
+    if (!isAiTyping || !accessToken || !selected) {
+      if (typingPollRef.current) {
+        clearInterval(typingPollRef.current);
+        typingPollRef.current = null;
+      }
+      return;
+    }
+    const poll = async () => {
+      if (!accessToken || !selected) return;
+      try {
+        const state = await getTypingState(accessToken, selected.id);
+        if (!state.is_typing) {
+          setIsAiTyping(false);
+          if (typingPollRef.current) {
+            clearInterval(typingPollRef.current);
+            typingPollRef.current = null;
+          }
+        }
+      } catch {
+        // ignore polling errors
+      }
+    };
+    typingPollRef.current = setInterval(poll, 800);
+    return () => {
+      if (typingPollRef.current) {
+        clearInterval(typingPollRef.current);
+        typingPollRef.current = null;
+      }
+    };
+  }, [isAiTyping, accessToken, selected?.id]);
 
   async function openConversation(conv: ConversationSummary) {
     if (!accessToken) return;
@@ -182,33 +216,64 @@ export function ConversationsWorkspace() {
   async function handleSend() {
     const content = newMessage.trim();
     if (!content || !accessToken || !selected || isSending) return;
+
+    const tempId = `optimistic-${Date.now()}`;
+    const optimisticMsg: MessageSummary = {
+      id: tempId,
+      empresa_id: selected.empresa_id,
+      conversation_id: selected.id,
+      role: "client",
+      content,
+      sender_name: "Tú",
+      extra_data: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setSelected((prev) => {
+      if (!prev) return prev;
+      return { ...prev, messages: [...prev.messages, optimisticMsg] };
+    });
+    setNewMessage("");
     setIsSending(true);
+    setIsAiTyping(true);
+
     try {
-      const msg = await addMessage(accessToken, selected.id, {
-        role: "agent",
+      const result = await processMessage(accessToken, selected.id, {
         content,
+        role: "client",
         sender_name: "Tú",
       });
+
       setSelected((prev) => {
         if (!prev) return prev;
-        return { ...prev, messages: [...prev.messages, msg] };
+        const filtered = prev.messages.filter((m) => m.id !== tempId);
+        const updated = [result.message];
+        if (result.ai_reply) {
+          updated.push(result.ai_reply);
+        }
+        return { ...prev, messages: [...filtered, ...updated] };
       });
-      setNewMessage("");
-      setIsAiTyping(true);
-      try {
-        const aiReply = await generateAiReply(accessToken, selected.id);
-        setSelected((prev) => {
-          if (!prev) return prev;
-          return { ...prev, messages: [...prev.messages, aiReply] };
-        });
-      } catch {
-        // AI reply is optional; non-blocking
+
+      if (!result.typing.is_typing) {
+        setIsAiTyping(false);
       }
-    } catch {
-      setError(W.sendError);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        refreshSession();
+      }
+      setSelected((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          messages: prev.messages.map((m) =>
+            m.id === tempId ? { ...m, content: `${content} ${W.sendError}` } : m
+          ),
+        };
+      });
     } finally {
       setIsSending(false);
-      setIsAiTyping(false);
     }
   }
 

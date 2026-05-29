@@ -9,6 +9,9 @@ import type {
   ConversationStatus,
   MessageCreatePayload,
   MessageSummary,
+  ProcessMessagePayload,
+  ProcessMessageResponse,
+  TypingState,
 } from "@/types/conversation";
 
 type ListConversationsParams = {
@@ -88,5 +91,33 @@ export function generateAiReply(
 ): Promise<MessageSummary> {
   return apiPost<MessageSummary, Record<string, never>>(
     `/conversations/${conversationId}/ai-reply`, {}, { accessToken },
+  );
+}
+
+export function processMessage(
+  accessToken: string,
+  conversationId: string,
+  payload: ProcessMessagePayload,
+): Promise<ProcessMessageResponse> {
+  return apiPost<ProcessMessageResponse, ProcessMessagePayload>(
+    `/conversations/${conversationId}/process-message`, payload, { accessToken },
+  );
+}
+
+export function getTypingState(
+  accessToken: string,
+  conversationId: string,
+): Promise<TypingState> {
+  return apiGet<TypingState>(
+    `/conversations/${conversationId}/typing`, { accessToken },
+  );
+}
+
+export function regenerateAiReply(
+  accessToken: string,
+  conversationId: string,
+): Promise<MessageSummary> {
+  return apiPost<MessageSummary, Record<string, never>>(
+    `/conversations/${conversationId}/regenerate-ai-reply`, {}, { accessToken },
   );
 }

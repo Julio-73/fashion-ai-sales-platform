@@ -1,4 +1,3 @@
-from collections.abc import AsyncGenerator
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,5 +20,6 @@ async def get_llm_service() -> LLMService:
 
 async def get_ai_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    llm_service: Annotated[LLMService, Depends(get_llm_service)],
 ) -> AIService:
-    return AIService(session=session)
+    return AIService(session=session, llm_service=llm_service)

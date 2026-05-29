@@ -60,3 +60,19 @@ export type AddMessageCoreResponse = {
   message: MessageSummary;
   ai_reply: MessageSummary | null;
 };
+
+export type TypingState = {
+  is_typing: boolean;
+};
+
+export type ProcessMessageResponse = {
+  message: MessageSummary;
+  ai_reply: MessageSummary | null;
+  typing: TypingState;
+};
+
+export type ProcessMessagePayload = {
+  content: string;
+  role: "agent" | "client" | "system";
+  sender_name?: string | null;
+};

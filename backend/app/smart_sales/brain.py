@@ -26,8 +26,21 @@ from app.smart_sales.reasoning.confidence_scorer import ConfidenceScorer
 from app.smart_sales.reasoning.contextual_reasoner import ContextualReasoner
 from app.smart_sales.recommendation_engine import RecommendationEngine
 from app.smart_sales.sales_responder import SalesResponder
+from app.smart_sales.contextual_commitment import (
+    CommitmentStage,
+    CommitmentStateMachine,
+    ContextLockEngine,
+    EliteProductConfirmation,
+    ResponseFocusGuard,
+    RejectionRecoveryEngine,
+    SelectedProductTracker,
+)
 
 logger = logging.getLogger("ai_sales_agent.smart_sales.brain")
+
+_shared_tracker = SelectedProductTracker()
+_shared_state_machine = CommitmentStateMachine()
+_shared_memory_manager = ConversationMemoryManager()
 
 
 class SmartSalesBrain:
@@ -38,7 +51,6 @@ class SmartSalesBrain:
     ) -> None:
         self._session = session
         self._provider = provider or OpenAIProvider()
-        self._memory_manager = ConversationMemoryManager()
         self._entity_extractor = EntityExtractor()
         self._product_matcher = ProductMatcher()
         self._contextual_reasoner = ContextualReasoner()
@@ -62,6 +74,17 @@ class SmartSalesBrain:
             confidence_scorer=self._confidence_scorer,
         )
 
+        self._memory_manager = _shared_memory_manager
+        self._commitment_tracker = _shared_tracker
+        self._commitment_state_machine = _shared_state_machine
+        self._context_lock = ContextLockEngine(
+            tracker=self._commitment_tracker,
+            state_machine=self._commitment_state_machine,
+        )
+        self._product_confirmation = EliteProductConfirmation()
+        self._response_focus_guard = ResponseFocusGuard()
+        self._rejection_recovery = RejectionRecoveryEngine()
+
     async def generate_reply(
         self,
         *,
@@ -77,10 +100,67 @@ class SmartSalesBrain:
         router_result = self._conversational_router.process(
             message=user_message,
             conversation_id=str(conversation_id) if conversation_id else None,
+            empresa_id=str(empresa_id),
         )
         if router_result.handled:
             logger.info("Conversational router handled message as %s (conf=%.2f)", router_result.intent.value, router_result.confidence)
             return router_result.response
+
+        conv_id_str = str(conversation_id) if conversation_id else f"emp_{empresa_id}"
+
+        lock_result = self._context_lock.evaluate(
+            conversation_id=conv_id_str,
+            user_message=user_message,
+        )
+
+        commitment_data = self._commitment_tracker.get_or_create(conv_id_str)
+
+        recovery = None
+        if lock_result.recovery_data:
+            recovery = self._rejection_recovery.process(
+                commitment=commitment_data,
+                user_message=user_message,
+            )
+
+        if lock_result.should_bypass_catalog():
+            logger.info(
+                "Context lock active for conv %s: product=%s color=%s size=%s stage=%s",
+                conv_id_str, lock_result.locked_product,
+                lock_result.locked_color, lock_result.locked_size,
+                lock_result.commitment_stage.value,
+            )
+            confirmation = self._product_confirmation.generate(
+                commitment=commitment_data,
+                user_message=user_message,
+            )
+            if confirmation:
+                focused = await self._apply_human_sales_layer(
+                    empresa_id=empresa_id,
+                    user_message=user_message,
+                    response=confirmation.text,
+                    entities_dict={
+                        "product_type": commitment_data.selected_category or "",
+                        "size": commitment_data.selected_size or "",
+                        "color": commitment_data.selected_color or "",
+                        "gender": "",
+                        "style": "",
+                        "occasion": "",
+                    },
+                    matched=[],
+                    conversation_id=conv_id_str,
+                    memory_ctx=memory_ctx,
+                )
+                guard = self._response_focus_guard.check(focused, commitment_data)
+                if guard.is_blocked:
+                    logger.warning("Focus guard blocked human sales output, using raw confirmation")
+                    return confirmation.text
+                return focused
+
+        if recovery and recovery.recovery_prompt:
+            logger.info(
+                "Recovery prompt for conv %s: category=%s",
+                conv_id_str, recovery.recovered_category,
+            )
 
         entities = self._entity_extractor.extract(user_message)
         entities_dict = {
@@ -97,11 +177,25 @@ class SmartSalesBrain:
             entities_dict = memory_ctx.merge_entities(entities_dict)
             entities_dict = self._contextual_reasoner.infer_context(user_message, entities_dict)
 
+        if recovery and recovery.needs_recovery:
+            entities_dict = self._rejection_recovery.build_recovery_context(recovery, entities_dict)
+            logger.info(
+                "Recovery context applied: category=%s",
+                recovery.recovered_category,
+            )
+
         if conversation_id:
             logger.info(
                 "Memory context for conv %s: %s",
                 conversation_id,
                 memory_ctx.get_context_summary() if memory_ctx else "none",
+            )
+
+        if lock_result.should_bypass_catalog():
+            self._context_lock.lock_product(
+                conv_id_str,
+                product_name=lock_result.locked_product or "",
+                category=lock_result.locked_category,
             )
 
         logger.info(
@@ -116,6 +210,22 @@ class SmartSalesBrain:
             entities=entities,
             limit=15,
         )
+
+        if commitment_data.commitment_level.value >= 2 and not commitment_data.selected_product and matched:
+            top = matched[0]
+            self._context_lock.lock_product(
+                conv_id_str,
+                product_name=top.name,
+                product_id=str(top.id) if hasattr(top, "id") and top.id else None,
+                category=top.category if hasattr(top, "category") else None,
+            )
+            lock_result.is_locked = True
+            lock_result.locked_product = top.name
+            lock_result.locked_category = top.category if hasattr(top, "category") else None
+            logger.info(
+                "Post-extraction lock for conv %s: product=%s (commitment_level=%s)",
+                conv_id_str, top.name, commitment_data.commitment_level,
+            )
 
         if matched:
             matched = self._product_ranker.rank_products(
@@ -156,23 +266,41 @@ class SmartSalesBrain:
                 memory_ctx.follow_up_count += 1
 
         response = await self._apply_human_sales_layer(
+            empresa_id=empresa_id,
             user_message=user_message,
             response=response,
             entities_dict=entities_dict,
             matched=matched,
             conversation_id=str(conversation_id) if conversation_id else "",
+            memory_ctx=memory_ctx,
         )
+
+        if lock_result.should_bypass_catalog():
+            guard = self._response_focus_guard.check(response, commitment_data)
+            if guard.is_blocked:
+                logger.warning(
+                    "Focus guard blocked final response for conv %s: %s",
+                    conv_id_str, guard.block_reason,
+                )
+                confirmation = self._product_confirmation.generate(
+                    commitment=commitment_data,
+                    user_message=user_message,
+                )
+                if confirmation:
+                    return confirmation.text
 
         return response
 
     async def _apply_human_sales_layer(
         self,
         *,
+        empresa_id: UUID | None = None,
         user_message: str,
         response: str,
         entities_dict: dict,
         matched: list,
         conversation_id: str,
+        memory_ctx=None,
     ) -> str:
         try:
             top_product = matched[0] if matched else None
@@ -180,6 +308,7 @@ class SmartSalesBrain:
 
             input_data = HumanSalesInput(
                 user_message=user_message,
+                empresa_id=str(empresa_id) if empresa_id else "",
                 conversation_id=conversation_id,
                 product_name=top_product.name if top_product else "",
                 product_category=top_product.category if top_product else "",
@@ -212,7 +341,7 @@ class SmartSalesBrain:
                 available_colors=top_product.available_colors if top_product and hasattr(top_product, "available_colors") else [],
                 emotional_state=v3_output.emotional.state.value if v3_output.emotional else "",
                 sales_stage=v3_output.current_stage.value if v3_output.current_stage else "",
-                has_product_history=bool(matched),
+                has_product_history=bool(matched) or (memory_ctx is not None and memory_ctx.has_product_history()),
                 confidence_level=v3_output.emotional.state.value if v3_output.emotional else "",
             )
 

@@ -41,6 +41,16 @@ class TestAIOrchestrationEnterprise:
             should_reply=True,
             reply_type=ReplyType.sales,
             generated_response="Te recomiendo nuestro vestido rojo premium.",
+        ))), patch.object(service._real_context_builder, "build_rich_context", AsyncMock(return_value=RichContextData(
+            customer=RichCustomerProfile(
+                customer_id=self.CUSTOMER_ID,
+                full_name="Test User",
+                lead_score=0.0,
+                tags=[],
+            ),
+            conversation=ConversationHistory(),
+            products=ProductContextDetail(),
+            sales=SalesContextDetail(),
         ))):
             result = await service.respond(request)
 

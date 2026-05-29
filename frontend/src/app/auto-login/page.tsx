@@ -7,7 +7,8 @@ export default function AutoLoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/auth/login", {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+    fetch(`${apiBaseUrl}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "demo@fashionsales.ai", password: "Demo@2024!" }),

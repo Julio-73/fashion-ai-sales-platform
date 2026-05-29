@@ -5,8 +5,12 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.security.dependencies import TenantContext
 from app.core.security.permissions import require_permission
-from app.modules.conversations.ai_reply import AutoReplyGenerator
-from app.modules.conversations.dependencies import get_auto_reply_generator, get_conversation_service
+from app.modules.conversations.ai_reply import AutoReplyGenerator, TypingStateManager
+from app.modules.conversations.dependencies import (
+    get_auto_reply_generator,
+    get_conversation_service,
+    get_typing_manager,
+)
 from app.modules.conversations.schemas import (
     ConversationCreateRequest,
     ConversationDetailResponse,
@@ -16,6 +20,9 @@ from app.modules.conversations.schemas import (
     ConversationUpdateRequest,
     MessageCreateRequest,
     MessageResponse,
+    ProcessMessageRequest,
+    ProcessMessageResponse,
+    TypingState,
 )
 from app.modules.conversations.service import ConversationService
 
@@ -87,6 +94,45 @@ async def add_message(
     service: Annotated[ConversationService, Depends(get_conversation_service)],
 ) -> MessageResponse:
     return await service.add_message(tenant=tenant, conversation_id=conversation_id, payload=payload)
+
+
+@router.post("/{conversation_id}/process-message", response_model=ProcessMessageResponse, status_code=status.HTTP_201_CREATED)
+async def process_message(
+    conversation_id: UUID,
+    payload: ProcessMessageRequest,
+    tenant: Annotated[TenantContext, Depends(require_permission("conversations:write"))],
+    generator: Annotated[AutoReplyGenerator, Depends(get_auto_reply_generator)],
+) -> ProcessMessageResponse:
+    return await generator.process_message(
+        empresa_id=tenant.empresa_id,
+        conversation_id=conversation_id,
+        payload=payload,
+    )
+
+
+@router.get("/{conversation_id}/typing", response_model=TypingState)
+async def get_typing_state(
+    conversation_id: UUID,
+    tenant: Annotated[TenantContext, Depends(require_permission("conversations:read"))],
+    typing_manager: Annotated[TypingStateManager, Depends(get_typing_manager)],
+) -> TypingState:
+    return typing_manager.get_state(str(conversation_id))
+
+
+@router.post("/{conversation_id}/regenerate-ai-reply", response_model=MessageResponse)
+async def regenerate_ai_reply(
+    conversation_id: UUID,
+    tenant: Annotated[TenantContext, Depends(require_permission("conversations:write"))],
+    generator: Annotated[AutoReplyGenerator, Depends(get_auto_reply_generator)],
+) -> MessageResponse:
+    reply = await generator.regenerate_last_reply(
+        empresa_id=tenant.empresa_id,
+        conversation_id=conversation_id,
+    )
+    if not reply:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="No se pudo regenerar respuesta AI")
+    return reply
 
 
 @router.post("/{conversation_id}/ai-reply", response_model=MessageResponse)

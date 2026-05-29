@@ -37,9 +37,6 @@ class CustomerMemoryService:
         favorite_categories = await self._repo.get_favorite_categories(
             empresa_id=empresa_id, customer_id=customer_id
         )
-        lead_evolution = await self._repo.get_lead_score_evolution(
-            empresa_id=empresa_id, customer_id=customer_id
-        )
         tags = customer.tags or []
         is_vip = any(t.lower() in ("vip", "premium", "recurrente") for t in tags)
 

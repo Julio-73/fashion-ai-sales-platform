@@ -1,9 +1,8 @@
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai_live.models import ConversationAIEvent, ConversationAIState

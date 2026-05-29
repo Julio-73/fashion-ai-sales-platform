@@ -1,6 +1,4 @@
 import logging
-from collections.abc import Sequence
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select, text
@@ -8,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import ConversationCore, MessageCore
 from app.modules.customers.models import Cliente
-from app.modules.products.models import ProductVariant, Producto
 
 logger = logging.getLogger("ai_sales_agent.ai.context.repositories.customer")
 

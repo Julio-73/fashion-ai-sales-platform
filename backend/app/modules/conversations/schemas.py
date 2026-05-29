@@ -65,3 +65,23 @@ class ConversationListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ProcessMessageRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10000)
+    role: MessageRole = "client"
+    sender_name: str | None = Field(default=None, max_length=160)
+
+
+class TypingState(BaseModel):
+    is_typing: bool
+
+
+class ProcessMessageResponse(BaseModel):
+    message: MessageResponse
+    ai_reply: MessageResponse | None = None
+    typing: TypingState
+
+
+class RegenerateRequest(BaseModel):
+    conversation_id: UUID | None = None

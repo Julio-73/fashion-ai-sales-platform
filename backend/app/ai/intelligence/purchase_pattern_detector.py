@@ -1,12 +1,10 @@
 import logging
-from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import ConversationCore, MessageCore
-from app.modules.customers.models import Cliente
 
 logger = logging.getLogger("ai_sales_agent.ai.intelligence.purchase_pattern")
 

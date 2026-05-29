@@ -47,6 +47,7 @@ class ConversationalRouterEngine:
         self,
         message: str,
         conversation_id: str | None = None,
+        empresa_id: str | None = None,
         gender: str | None = None,
         force_refresh: bool = False,
     ) -> RouterResult:
@@ -56,6 +57,8 @@ class ConversationalRouterEngine:
             return result
 
         cid = conversation_id or "__global__"
+        if empresa_id:
+            cid = f"{empresa_id}:{cid}"
 
         intent_result: IntentResult = self._detector.detect(message)
         result.intent = intent_result.intent

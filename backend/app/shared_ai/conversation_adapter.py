@@ -3,9 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.conversations.models import ConversationCore, MessageCore
 from app.conversations.repository import ConversationCoreRepository
-from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.repository import ConversationRepository
 
 logger = logging.getLogger("ai_sales_agent.shared_ai.conversation_adapter")

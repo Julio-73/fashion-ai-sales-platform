@@ -19,7 +19,6 @@ from app.ai.schemas.ai_schemas import (
     ProductContextDetail,
     ProductInterest,
     RichContextData,
-    RichCustomerProfile,
 )
 
 logger = logging.getLogger("ai_sales_agent.ai.context.services.real_context_builder")

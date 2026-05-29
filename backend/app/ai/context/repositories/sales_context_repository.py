@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import ConversationCore
@@ -26,7 +26,6 @@ class SalesContextRepository:
         if customer is None:
             return "low"
         score = customer.lead_score or 0
-        priority = customer.priority or "cold"
         status = customer.lead_status
         if score >= 60:
             return "high"
