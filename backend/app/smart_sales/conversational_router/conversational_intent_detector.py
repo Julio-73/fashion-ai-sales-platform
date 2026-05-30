@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 class ConversationalIntent(str, Enum):
     greeting = "greeting"
     gratitude = "gratitude"
+    farewell = "farewell"
     casual_chat = "casual_chat"
     hesitation = "hesitation"
     confusion = "confusion"
@@ -34,7 +35,8 @@ SHORT_WORDS: set[str] = {
     "gracias", "grax", "thanks", "thank", "ok", "okay", "okei", "dale",
     "listo", "perfecto", "genial", "excelente", "sale", "simon", "si",
     "no", "nop", "nope", "mmm", "hmm", "emm", "ah", "ahh", "wow",
-    "wuuu", "oha", "oye", "ey",
+    "wuuu", "oha", "oye", "ey", "byee", "chao", "chau", "adiós", "adios",
+    "bye", "bai", "nos vemos",
 }
 
 
@@ -54,11 +56,20 @@ PATTERNS: list[tuple[str, ConversationalIntent, float]] = [
     (r"\b(?:lo pensar[eé]|lo voy a pensar|lo consulto|d[eé]jame pensar)\b", ConversationalIntent.hesitation, 0.85),
     (r"\b(?:luego vuelvo|despu[eé]s te escribo|ahorita veo)\b", ConversationalIntent.hesitation, 0.8),
 
+    # farewell (new)
+    (r"\b(?:eso es todo|es todo|n[aá]da m[aá]s|eso ser[ií]a todo)\b", ConversationalIntent.farewell, 0.95),
+    (r"^(?:chao|chau|adi[oó]s|adios|bye|bai|nos vemos|hasta luego|hasta pronto)\b", ConversationalIntent.farewell, 0.95),
+    (r"\b(?:gracias\s+(?:por\s+tu\s+ayuda|por\s+todo|igual|de todas formas))\b", ConversationalIntent.farewell, 0.85),
+    (r"\b(?:ya me voy|me retiro|gracias por\s+tu\s+tiempo)\b", ConversationalIntent.farewell, 0.85),
+
     # casual chat
     (r"^(?:ok|okay|okei|dale|listo|perfecto)\b", ConversationalIntent.casual_chat, 0.8),
     (r"^(?:genial|excelente|s[uú]per|bacan|ch[eé]vere|wow)\b", ConversationalIntent.casual_chat, 0.8),
     (r"^(?:sale|simon|si|ya|ah ya|ahh|enta)\b", ConversationalIntent.casual_chat, 0.7),
     (r"^(?:entiendo|comprendo|claro|oka)\b", ConversationalIntent.casual_chat, 0.7),
+    (r"\b(?:c[oó]mo est[aá]s|c[oó]mo te va|c[oó]mo andas|todo bien|qu[eé] tal tu d[ií]a)\b", ConversationalIntent.casual_chat, 0.9),
+    (r"\b(?:un gust[oa]|encantad[oa]|mucho gust[oa])\b", ConversationalIntent.casual_chat, 0.8),
+    (r"\b(?:gracias a ti|a ti gracias|igual gracias)\b", ConversationalIntent.gratitude, 0.85),
 
     # confusion
     (r"\b(?:c[oó]mo|c[oó]mo así|no entiendo|no comprendo|explica)\b", ConversationalIntent.confusion, 0.8),

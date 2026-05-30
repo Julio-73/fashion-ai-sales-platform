@@ -148,30 +148,14 @@ class ConversationalCloserEngine:
 
     def _build_gratitude_response(self, ctx: CloserInput) -> str:
         ack = self._acknowledgment.get_gratitude_response()
-        transition = self._transitions.get_transition(ctx.user_message, ctx.product_category)
-        styling = ""
-        if ctx.product_name and ctx.product_category:
-            styling = "\n\nSi quieres, puedo ayudarte a armar el outfit completo 🔥"
-
-        parts = [ack]
-        if ctx.product_name:
-            parts.append(f"{ctx.product_name} {'en ' + ctx.product_color if ctx.product_color else ''}{' talla ' + ctx.product_size if ctx.product_size else ''} sí está disponible.")
-        if transition:
-            parts.append(transition)
-        if styling:
-            parts.append(styling)
-        parts.append("¿Algo más en que pueda ayudarte? 👌")
+        parts = [ack,
+                 "Si más adelante necesitas ayuda para elegir otra prenda, aquí estaré."]
         return "\n\n".join(parts)
 
     def _build_ok_response(self, ctx: CloserInput) -> str:
         ack = self._acknowledgment.get_ok_response()
-        transition = self._transitions.get_transition(ctx.user_message, ctx.product_category)
-        parts = [ack]
-        if transition:
-            parts.append(transition)
-        if ctx.product_name:
-            parts.append(f"Recuerda que {ctx.product_name} está disponible.")
-        parts.append("¿Necesitas algo más? 😊")
+        parts = [ack,
+                 "Si necesitas algo más, acá estoy 😊"]
         return "\n\n".join(parts)
 
     def _build_hesitation_response(self, ctx: CloserInput) -> str:

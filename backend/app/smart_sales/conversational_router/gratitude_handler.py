@@ -2,24 +2,23 @@ import random
 
 
 GRATITUDE_RESPONSES: list[str] = [
-    "Con gusto 😊 Si luego quieres combinar esa casaca con zapatillas o jeans, puedo ayudarte.",
-    "Encantado 🔥 Y si deseas armar el outfit completo, aquí estoy.",
-    "Perfecto 👌 Cualquier cosa, te ayudo a encontrar más opciones.",
-    "A ti por confiar 🙌 Si necesitas algo más, acá me tienes.",
-    "Un placer 😊 Recuerda que puedo ayudarte a combinar o elegir accesorios.",
-    "De nada 🔥 Si quieres te enseño cómo queda ese modelo con otras prendas.",
-    "¡Gracias a ti! 😎 Siempre que quieras ver más novedades, avísame.",
-    "Contento de ayudar 😊 Si quieres luego te recomiendo outfits completos.",
-    "Fue un gusto 🔥 Y si algún día quieres cambiar de estilo, aquí estoy.",
-    "¡Listo! 😊 Ya sabes, para lo que necesites estoy acá.",
+    "Con gusto 😊 Si más adelante necesitas ayuda para elegir otra prenda, aquí estaré.",
+    "Un placer 😊 Cuando quieras, acá estaré para ayudarte.",
+    "A ti por tu confianza 🙌 Que tengas un excelente día.",
+    "De nada 😊 Estoy aquí para cuando me necesites.",
+    "Encantado de ayudar 🔥 Si luego surge algo, no dudes en escribirme.",
+    "¡Gracias a ti! 😎 Espero verte pronto de vuelta.",
+    "Fue un gusto asistirte 😊 Para cualquier cosa, acá me tienes.",
+    "Contento de haber podido ayudar 🙌 Que estés muy bien.",
+    "Con gusto, para eso estoy 😊 Cuídate mucho.",
+    "¡Listo! 😊 Cuando necesites algo más, ya sabes dónde encontrarme.",
 ]
 
 _closing_offers: list[str] = [
-    " ¿Quieres que te ayude con el pedido?",
-    " ¿Te paso más info de esa prenda?",
     "",
     "",
-    " ¿Necesitas saber tallas o colores disponibles?",
+    "",
+    "",
 ]
 
 _context_index: dict[str, int] = {}

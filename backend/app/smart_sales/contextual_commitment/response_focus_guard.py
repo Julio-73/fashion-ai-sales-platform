@@ -15,10 +15,18 @@ CATALOG_LISTING_PATTERNS: list[re.Pattern] = [
     re.compile(r'\b(lista\s+de\s+productos)\b', re.IGNORECASE),
     re.compile(r'\b(tenemos\s+disponibles)\b', re.IGNORECASE),
     re.compile(r'\b(estos\s+(modelos|productos))\b', re.IGNORECASE),
+    re.compile(r'\b(te\s+gustar[ií]a\s+ver)\b', re.IGNORECASE),
+    re.compile(r'\b(quieres\s+que\s+te\s+muestre)\b', re.IGNORECASE),
 ]
 
 MULTIPLE_PRODUCT_PATTERN: re.Pattern = re.compile(
     r'(?:•|\*|-|\d+\.)\s*\w+.*\(?(?:S/|USD|\$)?\s*\d+',
+    re.IGNORECASE,
+)
+
+# Also block any response that lists 2+ product names with prices/bullets
+BULLET_PRODUCT_PATTERN: re.Pattern = re.compile(
+    r'(?:•|\*|-)\s+\w+\s+\w+.*(?:S/|USD|\$|precio|soles)',
     re.IGNORECASE,
 )
 
@@ -60,6 +68,13 @@ class ResponseFocusGuard:
             logger.warning("Focus guard blocked: multiple products listed in response")
             return result
 
+        if BULLET_PRODUCT_PATTERN.search(response):
+            result.is_blocked = True
+            result.block_reason = "bullet_product_listing"
+            result.contains_multiple_products = True
+            logger.warning("Focus guard blocked: bullet product listing in response")
+            return result
+
         return result
 
     def sanitize(self, response: str, commitment: CommitmentData) -> str:
@@ -69,6 +84,7 @@ class ResponseFocusGuard:
         for pattern in CATALOG_LISTING_PATTERNS:
             response = pattern.sub("", response)
         response = MULTIPLE_PRODUCT_PATTERN.sub("", response)
+        response = BULLET_PRODUCT_PATTERN.sub("", response)
         response = re.sub(r'\n{3,}', '\n\n', response)
         response = response.strip()
 

@@ -268,7 +268,7 @@ export function ConversationsWorkspace() {
       setRefreshKey((k) => k + 1);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        refreshSession();
+        try { await refreshSession(); } catch { /* ignore */ }
       }
       setSelected((prev) => {
         if (!prev) return prev;

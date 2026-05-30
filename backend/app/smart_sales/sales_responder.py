@@ -43,6 +43,25 @@ class SalesResponder:
         self._follow_up_engine = follow_up_engine or FollowUpEngine()
         self._confidence_scorer = confidence_scorer or ConfidenceScorer()
 
+    def _is_size_only_question(self, message: str, entities: dict) -> bool:
+        msg = message.lower().strip()
+        size = entities.get("size")
+        if not size:
+            return False
+        size_words = {"talla", "talle", "size", "hay", "tienen", "consiguen", "manejan", "disponible"}
+        msg_words = set(msg.split())
+        return bool(msg_words & size_words)
+
+    def _is_simple_interest(self, message: str, entities: dict) -> bool:
+        msg = message.lower().strip()
+        interest_phrases = ["me gusta", "me interesa", "quiero ese", "quiero esta",
+                            "me quedo con", "ese me gusta", "ese quiero", "lo quiero",
+                            "me encanta", "se ve bien", "buena opción"]
+        for phrase in interest_phrases:
+            if phrase in msg:
+                return True
+        return False
+
     async def generate_response(
         self,
         *,
@@ -71,6 +90,26 @@ class SalesResponder:
         )
 
         if in_stock:
+            # If user is only asking about size, answer directly without full catalog
+            if self._is_size_only_question(user_message, entities_dict) and entities_dict.get("size"):
+                product = in_stock[0]
+                size = entities_dict["size"]
+                price_info = f" ({product.price_range})" if product.price_range else ""
+                return (
+                    f"Sí 😊 Tenemos disponibilidad en talla {size} para {product.name}{price_info}.\n"
+                    f"¿Deseas que lo reserve para ti?"
+                )
+
+            # If user expresses interest in a product, go into closing mode
+            if self._is_simple_interest(user_message, entities_dict):
+                product = in_stock[0]
+                price_info = f" ({product.price_range})" if product.price_range else ""
+                return (
+                    f"Excelente elección 🔥\n"
+                    f"{product.name}{price_info} es uno de los más solicitados.\n"
+                    f"¿Lo prefieres en alguna talla o color específico?"
+                )
+
             return await self._build_premium_stock_response(
                 empresa_id=empresa_id,
                 entities=entities_dict,
@@ -103,11 +142,26 @@ class SalesResponder:
         style_profile = self._style_system.detect_style_profile(entities, products)
         emoji = self._style_system.get_emoji(style_profile)
 
+        product_type = entities.get("product_type", "opciones")
+
+        # If there's a single product match and user has asked about it specifically, focus on it
+        if len(products) == 1 and entities.get("product_type"):
+            p = products[0]
+            colors_str = ", ".join(p.available_colors[:3]) if p.available_colors else ""
+            prices_str = p.price_range or ""
+            sizes = ", ".join(sorted(p.available_sizes, key=self._size_order)) if p.available_sizes else ""
+            return (
+                f"Excelente elección 🔥\n"
+                f"{p.name} está disponible{prices_str and f' ({prices_str})' or ''}.\n"
+                f"¿Lo prefieres en {'algún color en especial' if colors_str else 'alguna talla específica'}"
+                f"{f' — tenemos: {colors_str}' if colors_str else ''}"
+                f"{f', tallas: {sizes}' if sizes else ''}?"
+            )
+
         parts = []
         opening = self._humanizer.pick_opening()
         parts.append(opening)
 
-        product_type = entities.get("product_type", "opciones")
         if confidence.score >= 60:
             parts.append(f"Tenemos estas {product_type} disponibles{emoji}")
         else:
@@ -181,6 +235,16 @@ class SalesResponder:
         parts.append(self._humanizer.pick_closing())
         return " ".join(parts)
 
+    def _is_discontent(self, message: str) -> bool:
+        msg = message.lower().strip()
+        discontent = ["no me convenció", "no me gustó", "no me gusta", "no me convence",
+                      "no me llama", "no es lo que busco", "esperaba otra cosa",
+                      "no es lo mío", "no me convence mucho"]
+        for phrase in discontent:
+            if phrase in msg:
+                return True
+        return False
+
     async def _build_premium_fallback_response(
         self,
         *,
@@ -195,6 +259,13 @@ class SalesResponder:
         occasion = entities.get("occasion")
         style = entities.get("style")
 
+        # Handle objection/discontent — explore what they didn't like
+        if self._is_discontent(user_message):
+            return (
+                "Entiendo 😊 ¿Qué fue lo que no te convenció? ¿El estilo, "
+                "el color, el precio o el tipo de prenda? Así puedo ayudarte mejor."
+            )
+
         if product_type:
             recommendations = await self._recommendation_engine.generate_recommendations(
                 empresa_id=empresa_id,
@@ -202,11 +273,10 @@ class SalesResponder:
             )
             if recommendations:
                 recs = ", ".join(r.category for r in recommendations[:3])
-                return (f"No encontré exactamente {product_type} en este momento 😊 "
-                        f"pero tenemos opciones similares en {recs}. "
-                        f"{self._humanizer.pick_closing()}")
-            return (f"Por ahora no tengo {product_type} disponible en el catálogo activo 🫤 "
-                    f"¿Quieres explorar otras categorías? {self._humanizer.pick_follow_up()}")
+                return (f"No tengo {product_type} disponibles actualmente 😊 "
+                        f"Sin embargo, contamos con {recs}. ¿Te interesa alguna?")
+            return (f"No tengo {product_type} disponibles actualmente 😊 "
+                    f"¿Quieres explorar otras categorías?")
 
         if style and not product_type:
             style_fallbacks = {

@@ -6,6 +6,7 @@ from .greeting_handler import get_greeting
 from .gratitude_handler import get_gratitude_response
 from .hesitation_handler import get_hesitation_response
 from .casual_conversation_handler import get_casual_response
+from .farewell_handler import get_farewell_response
 from .conversational_state_router import (
     ConversationalStateRouter,
     ConversationStage,
@@ -32,6 +33,7 @@ HANDLED_INTENTS: set[ConversationalIntent] = {
     ConversationalIntent.gratitude,
     ConversationalIntent.hesitation,
     ConversationalIntent.casual_chat,
+    ConversationalIntent.farewell,
 }
 
 MIN_CONFIDENCE: float = 0.6
@@ -77,7 +79,7 @@ class ConversationalRouterEngine:
         transition = self._state_router.transition(cid, intent_result.intent)
         result.transition = transition
 
-        response = self._build_response(intent_result.intent, cid, gender)
+        response = self._build_response(intent_result.intent, cid, gender, user_message=message)
 
         guard_check = self._response_guard.check_response(cid, response)
         if guard_check.is_blocked:
@@ -89,6 +91,13 @@ class ConversationalRouterEngine:
             response = backup
             guard_check2 = self._response_guard.check_response(cid, backup)
             if guard_check2.is_blocked:
+                # If farewell is blocked, still return it — don't let it fall through to catalog
+                if intent_result.intent == ConversationalIntent.farewell:
+                    response = backup
+                    self._response_guard.record_response(cid, response)
+                    result.handled = True
+                    result.response = response
+                    return result
                 return result
 
         self._response_guard.record_response(cid, response)
@@ -102,6 +111,7 @@ class ConversationalRouterEngine:
         intent: ConversationalIntent,
         conversation_id: str,
         gender: str | None = None,
+        user_message: str | None = None,
     ) -> str:
         if intent == ConversationalIntent.greeting:
             return get_greeting(conversation_id, gender)
@@ -110,7 +120,9 @@ class ConversationalRouterEngine:
         elif intent == ConversationalIntent.hesitation:
             return get_hesitation_response(conversation_id)
         elif intent == ConversationalIntent.casual_chat:
-            return get_casual_response(conversation_id)
+            return get_casual_response(conversation_id, user_message)
+        elif intent == ConversationalIntent.farewell:
+            return get_farewell_response(conversation_id)
         return ""
 
     def _build_fallback_response(
@@ -126,6 +138,8 @@ class ConversationalRouterEngine:
             return "Tómate tu tiempo 😊 Cuando quieras, acá estoy."
         elif intent == ConversationalIntent.casual_chat:
             return "Genial 😊 ¿Algo más en que pueda ayudarte?"
+        elif intent == ConversationalIntent.farewell:
+            return "Perfecto 😊 Gracias por visitarnos. Que tengas un excelente día."
         return ""
 
     def record_response(self, conversation_id: str, response: str) -> None:
