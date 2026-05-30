@@ -28,7 +28,7 @@ const navGroups = [
       { label: S.products, icon: Package, href: "/dashboard/products" },
       { label: S.chats, icon: MessageSquare, href: "/dashboard/conversations" },
       { label: S.analytics, icon: BarChart3, href: "/dashboard" },
-      { label: S.automations, icon: Workflow, href: "/dashboard" }
+      { label: S.automations, icon: Workflow, href: "/dashboard/automations" }
     ]
   },
   {

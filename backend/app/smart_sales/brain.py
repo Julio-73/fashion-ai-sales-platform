@@ -16,8 +16,10 @@ from app.smart_sales.conversational_router.conversational_router_engine import (
 )
 from app.smart_sales.humanization.follow_up_engine import FollowUpEngine
 from app.smart_sales.humanization.response_humanizer import ResponseHumanizer
+from app.smart_sales.humanization.sales_humanization_v6 import SalesHumanizationV6
 from app.smart_sales.humanization.style_system import StyleSystem
 from app.smart_sales.memory.conversation_memory import ConversationMemoryManager
+from app.smart_sales.order_flow_engine import OrderFlowEngine
 from app.smart_sales.product_context import ProductContextEngine
 from app.smart_sales.product_matcher import ProductMatcher
 from app.smart_sales.ranking.product_ranker import ProductRankingEngine
@@ -41,6 +43,7 @@ logger = logging.getLogger("ai_sales_agent.smart_sales.brain")
 _shared_tracker = SelectedProductTracker()
 _shared_state_machine = CommitmentStateMachine()
 _shared_memory_manager = ConversationMemoryManager()
+_shared_order_flow_engine = OrderFlowEngine()
 
 
 class SmartSalesBrain:
@@ -60,6 +63,7 @@ class SmartSalesBrain:
         self._recommendation_engine = RecommendationEngine(self._product_context)
         self._confidence_scorer = ConfidenceScorer()
         self._humanizer = ResponseHumanizer()
+        self._sales_humanization_v6 = SalesHumanizationV6()
         self._style_system = StyleSystem()
         self._follow_up_engine = FollowUpEngine()
         self._human_sales = HumanSalesPsychologyEngine()
@@ -75,6 +79,7 @@ class SmartSalesBrain:
         )
 
         self._memory_manager = _shared_memory_manager
+        self._order_flow_engine = _shared_order_flow_engine
         self._commitment_tracker = _shared_tracker
         self._commitment_state_machine = _shared_state_machine
         self._context_lock = ContextLockEngine(
@@ -97,15 +102,6 @@ class SmartSalesBrain:
             memory_ctx = self._memory_manager.get_or_create(conversation_id)
             memory_ctx.update_from_message(user_message)
 
-        router_result = self._conversational_router.process(
-            message=user_message,
-            conversation_id=str(conversation_id) if conversation_id else None,
-            empresa_id=str(empresa_id),
-        )
-        if router_result.handled:
-            logger.info("Conversational router handled message as %s (conf=%.2f)", router_result.intent.value, router_result.confidence)
-            return router_result.response
-
         conv_id_str = str(conversation_id) if conversation_id else f"emp_{empresa_id}"
 
         lock_result = self._context_lock.evaluate(
@@ -114,6 +110,42 @@ class SmartSalesBrain:
         )
 
         commitment_data = self._commitment_tracker.get_or_create(conv_id_str)
+
+        entities = self._entity_extractor.extract(user_message)
+        order_result = self._order_flow_engine.process(
+            conversation_id=conv_id_str,
+            user_message=user_message,
+            commitment=commitment_data,
+            entities=entities,
+        )
+        if order_result.handled:
+            if order_result.response and self._sales_humanization_v6.quality_score(order_result.response, commitment_data) == 0:
+                logger.warning("Order Flow V7 generated low-quality response for conv %s", conv_id_str)
+            if "reservado" in order_result.response.lower() or "reserva confirmada" in order_result.response.lower():
+                self._commitment_tracker.mark_reserved(conv_id_str)
+            logger.info("Order Flow V7 handled message: state=%s", order_result.state.value)
+            return order_result.response
+
+        active_v6 = self._sales_humanization_v6.process(
+            user_message=user_message,
+            commitment=commitment_data,
+            entities=entities,
+            matched_products=[],
+        )
+        if active_v6.handled:
+            if active_v6.should_mark_reserved:
+                self._commitment_tracker.mark_reserved(conv_id_str)
+            logger.info("Sales Humanization V6 handled active-context message: stage=%s", active_v6.stage)
+            return active_v6.response
+
+        router_result = self._conversational_router.process(
+            message=user_message,
+            conversation_id=str(conversation_id) if conversation_id else None,
+            empresa_id=str(empresa_id),
+        )
+        if router_result.handled:
+            logger.info("Conversational router handled message as %s (conf=%.2f)", router_result.intent.value, router_result.confidence)
+            return router_result.response
 
         recovery = None
         if lock_result.recovery_data:
@@ -162,7 +194,6 @@ class SmartSalesBrain:
                 conv_id_str, recovery.recovered_category,
             )
 
-        entities = self._entity_extractor.extract(user_message)
         entities_dict = {
             "product_type": entities.product_type,
             "size": entities.size,
@@ -226,6 +257,48 @@ class SmartSalesBrain:
                 "Post-extraction lock for conv %s: product=%s (commitment_level=%s)",
                 conv_id_str, top.name, commitment_data.commitment_level,
             )
+            commitment_data = self._commitment_tracker.get_or_create(conv_id_str)
+
+        matched_v6 = self._sales_humanization_v6.process(
+            user_message=user_message,
+            commitment=commitment_data,
+            entities=entities,
+            matched_products=matched,
+        )
+        if matched_v6.should_lock_product and matched_v6.product_name:
+            self._context_lock.lock_product(
+                conv_id_str,
+                product_name=matched_v6.product_name,
+                product_id=matched_v6.product_id,
+                category=matched_v6.product_category,
+            )
+            self._order_flow_engine.set_product(
+                conv_id_str,
+                product_name=matched_v6.product_name,
+                product_id=matched_v6.product_id,
+                product_category=matched_v6.product_category,
+            )
+            commitment_data = self._commitment_tracker.get_or_create(conv_id_str)
+            order_result = self._order_flow_engine.process(
+                conversation_id=conv_id_str,
+                user_message=user_message,
+                commitment=commitment_data,
+                entities=entities,
+            )
+            if order_result.handled:
+                logger.info("Order Flow V7 handled after product lock: state=%s", order_result.state.value)
+                return order_result.response
+            matched_v6 = self._sales_humanization_v6.process(
+                user_message=user_message,
+                commitment=commitment_data,
+                entities=entities,
+                matched_products=matched,
+            )
+        if matched_v6.handled:
+            if matched_v6.should_mark_reserved:
+                self._commitment_tracker.mark_reserved(conv_id_str)
+            logger.info("Sales Humanization V6 handled matched message: stage=%s", matched_v6.stage)
+            return matched_v6.response
 
         if matched:
             matched = self._product_ranker.rank_products(

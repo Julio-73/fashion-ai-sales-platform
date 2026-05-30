@@ -57,6 +57,7 @@ class CommitmentData:
     selected_size: str | None = None
     selected_category: str | None = None
     commitment_level: CommitmentLevel = CommitmentLevel.none
+    reservation_confirmed: bool = False
     last_rejection_category: str | None = None
     rejected_products: set[str] = field(default_factory=set)
     confirmation_count: int = 0
@@ -73,6 +74,7 @@ class CommitmentData:
         self.selected_color = None
         self.selected_size = None
         self.commitment_level = CommitmentLevel.none
+        self.reservation_confirmed = False
         self.confirmation_count = 0
 
     def has_any_selection(self) -> bool:
@@ -163,6 +165,13 @@ class SelectedProductTracker:
             "Product set for conv %s: %s (id=%s, cat=%s)",
             conversation_id, product_name, product_id, category,
         )
+
+    def mark_reserved(self, conversation_id: str) -> None:
+        data = self.get_or_create(conversation_id)
+        data.reservation_confirmed = True
+        data.commitment_level = CommitmentLevel.confirmed
+        data.confirmation_count += 1
+        logger.info("Reservation confirmed for conv %s: %s", conversation_id, data.selected_product)
 
     def clear(self, conversation_id: str) -> None:
         self._stores.pop(conversation_id, None)
