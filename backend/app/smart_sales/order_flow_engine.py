@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from enum import Enum
+from uuid import UUID
 
 from app.smart_sales.contextual_commitment.selected_product_tracker import CommitmentData
 from app.smart_sales.entity_extractor import ExtractedEntities
@@ -33,6 +34,7 @@ class OrderContext:
     delivery_address: str | None = None
     customer_name: str | None = None
     purchase_lock: bool = False
+    persisted_order_id: UUID | None = None
 
     @property
     def has_active_purchase(self) -> bool:
@@ -259,6 +261,9 @@ class OrderFlowEngine:
 
     def clear(self, conversation_id: str) -> None:
         self._contexts.pop(conversation_id, None)
+
+    def mark_persisted(self, conversation_id: str, order_id: UUID) -> None:
+        self.get_or_create(conversation_id).persisted_order_id = order_id
 
     def _handle_payment(self, ctx: OrderContext, message: str) -> OrderFlowResult:
         ctx.payment_method = self._extract_payment_method(message)

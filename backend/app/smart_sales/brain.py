@@ -28,6 +28,9 @@ from app.smart_sales.reasoning.confidence_scorer import ConfidenceScorer
 from app.smart_sales.reasoning.contextual_reasoner import ContextualReasoner
 from app.smart_sales.recommendation_engine import RecommendationEngine
 from app.smart_sales.sales_responder import SalesResponder
+from app.modules.orders.repository import OrderRepository
+from app.modules.orders.schemas import OrderCreateRequest, OrderItemCreateRequest
+from app.modules.orders.service import OrderService
 from app.smart_sales.contextual_commitment import (
     CommitmentStage,
     CommitmentStateMachine,
@@ -123,6 +126,8 @@ class SmartSalesBrain:
                 logger.warning("Order Flow V7 generated low-quality response for conv %s", conv_id_str)
             if "reservado" in order_result.response.lower() or "reserva confirmada" in order_result.response.lower():
                 self._commitment_tracker.mark_reserved(conv_id_str)
+            if order_result.state.value == "order_confirmed":
+                await self._persist_confirmed_order(empresa_id=empresa_id, conversation_id=conv_id_str)
             logger.info("Order Flow V7 handled message: state=%s", order_result.state.value)
             return order_result.response
 
@@ -286,6 +291,8 @@ class SmartSalesBrain:
                 entities=entities,
             )
             if order_result.handled:
+                if order_result.state.value == "order_confirmed":
+                    await self._persist_confirmed_order(empresa_id=empresa_id, conversation_id=conv_id_str)
                 logger.info("Order Flow V7 handled after product lock: state=%s", order_result.state.value)
                 return order_result.response
             matched_v6 = self._sales_humanization_v6.process(
@@ -490,3 +497,37 @@ class SmartSalesBrain:
                 matched_products=matched_products,
                 memory_ctx=memory_ctx,
             )
+
+    async def _persist_confirmed_order(self, *, empresa_id: UUID, conversation_id: str) -> None:
+        order_ctx = self._order_flow_engine.get_or_create(conversation_id)
+        if order_ctx.persisted_order_id or not order_ctx.customer_name or not order_ctx.product_name:
+            return
+
+        delivery_type = "delivery" if order_ctx.delivery_method == "Delivery" else "store_pickup"
+        product_id = None
+        try:
+            product_id = UUID(str(order_ctx.product_id)) if order_ctx.product_id else None
+        except ValueError:
+            product_id = None
+
+        payload = OrderCreateRequest(
+            customer_name=order_ctx.customer_name,
+            customer_phone=None,
+            delivery_type=delivery_type,
+            delivery_address=order_ctx.delivery_address,
+            status="confirmed",
+            items=[
+                OrderItemCreateRequest(
+                    product_id=product_id,
+                    product_name=order_ctx.product_name,
+                    size=order_ctx.size,
+                    color=order_ctx.color,
+                    quantity=1,
+                    price=0,
+                )
+            ],
+        )
+        service = OrderService(repository=OrderRepository(session=self._session))
+        order = await service.create_order_for_ai(empresa_id=empresa_id, payload=payload)
+        self._order_flow_engine.mark_persisted(conversation_id, order.id)
+        logger.info("Order persisted from AI checkout: conv=%s order=%s", conversation_id, order.order_number)

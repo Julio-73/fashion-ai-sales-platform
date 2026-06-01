@@ -10,6 +10,7 @@ from app.modules.chats.router import router as chats_router
 from app.modules.conversations.router import router as conversations_router
 from app.modules.companies.router import router as companies_router
 from app.modules.customers.router import router as customers_router
+from app.modules.orders.router import router as orders_router
 from app.modules.products.router import router as products_router
 from app.sales.api.router import router as sales_router
 
@@ -19,6 +20,7 @@ api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(companies_router, prefix="/companies", tags=["companies"])
 api_router.include_router(customers_router, prefix="/customers", tags=["customers"])
 api_router.include_router(products_router, prefix="/products", tags=["products"])
+api_router.include_router(orders_router, prefix="/orders", tags=["orders"])
 api_router.include_router(chats_router, prefix="/chats", tags=["chats"])
 api_router.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
 api_router.include_router(conversations_core_router, prefix="/conversations-core", tags=["conversations-core"])
@@ -26,4 +28,3 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(sales_router, prefix="/sales", tags=["sales"])
 api_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_router.include_router(ai_live_router, prefix="/ai-live", tags=["ai-live"])
-

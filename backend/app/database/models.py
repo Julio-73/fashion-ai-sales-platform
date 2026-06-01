@@ -8,4 +8,5 @@ def import_all_models() -> None:
     from app.modules.companies import models as companies_models  # noqa: F401
     from app.modules.conversations import models as conversations_models  # noqa: F401
     from app.modules.customers import models as customers_models  # noqa: F401
+    from app.modules.orders import models as orders_models  # noqa: F401
     from app.modules.products import models as products_models  # noqa: F401

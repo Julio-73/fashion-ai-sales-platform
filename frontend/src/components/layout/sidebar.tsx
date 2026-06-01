@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bot,
   Building2,
+  ClipboardList,
   MessageSquare,
   Package,
   Settings,
@@ -27,6 +28,7 @@ const navGroups = [
       { label: S.customers, icon: UsersRound, href: "/dashboard/customers" },
       { label: S.products, icon: Package, href: "/dashboard/products" },
       { label: S.chats, icon: MessageSquare, href: "/dashboard/conversations" },
+      { label: "Pedidos", icon: ClipboardList, href: "/dashboard/orders" },
       { label: S.analytics, icon: BarChart3, href: "/dashboard" },
       { label: S.automations, icon: Workflow, href: "/dashboard/automations" }
     ]
