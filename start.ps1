@@ -58,3 +58,5 @@ Write-Info "Auto-Login: http://localhost:$FrontendPort/auto-login"
 Write-Host ""
 Write-Host "Para detener: Get-Process | Where-Object { \$_.Id -in @($($be.Id), $($fe.Id)) } | Stop-Process" -ForegroundColor Gray
 Write-Host "O usa: taskkill /F /PID $($be.Id) & taskkill /F /PID $($fe.Id)" -ForegroundColor Gray
+
+
