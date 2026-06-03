@@ -338,7 +338,7 @@ class InventoryService:
     ) -> InventoryAggregateMetrics:
         agg = await self._repository.aggregate_metrics(empresa_id=tenant.empresa_id)
         top = await self._repository.top_selling(empresa_id=tenant.empresa_id, limit=5)
-        low = await self._repository.low_stock(empresa_id=tenant.empresa_id, limit=5)
+        low = await self._repository.lowest_stock(empresa_id=tenant.empresa_id, limit=5)
         return InventoryAggregateMetrics(
             total_products=agg["total_products"],
             out_of_stock=agg["out_of_stock"],

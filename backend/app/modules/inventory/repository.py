@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from app.modules.inventory.models import (
     InventoryItem,
@@ -102,6 +102,7 @@ class InventoryRepository:
     ) -> tuple[Sequence[tuple[Producto, InventoryItem | None]], int]:
         query = (
             select(Producto, InventoryItem)
+            .options(selectinload(Producto.variants), selectinload(Producto.images))
             .outerjoin(
                 InventoryItem,
                 and_(
@@ -442,7 +443,7 @@ class InventoryRepository:
     ) -> Producto | None:
         result = await self._session.execute(
             select(Producto)
-            .options(joinedload(Producto.variants), joinedload(Producto.images))
+            .options(selectinload(Producto.variants), selectinload(Producto.images))
             .where(
                 Producto.empresa_id == empresa_id,
                 Producto.id == product_id,
