@@ -26,6 +26,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "ai:classify",
         "ai:context",
         "ai:respond",
+        "whatsapp:read",
+        "whatsapp:write",
+        "whatsapp:admin",
     },
     "admin": {
         "auth:me",
@@ -45,6 +48,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "ai:classify",
         "ai:context",
         "ai:respond",
+        "whatsapp:read",
+        "whatsapp:write",
+        "whatsapp:admin",
     },
     "sales_agent": {
         "auth:me",
@@ -61,6 +67,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "ai:classify",
         "ai:context",
         "ai:respond",
+        "whatsapp:read",
+        "whatsapp:write",
     },
     "analyst": {
         "auth:me",
@@ -70,6 +78,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "analytics:read",
         "orders:read",
         "sales:read",
+        "whatsapp:read",
     },
 }
 

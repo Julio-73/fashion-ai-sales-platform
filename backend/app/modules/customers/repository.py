@@ -19,6 +19,31 @@ class CustomerRepository:
         await self._session.flush()
         return customer
 
+    async def find_by_phone(
+        self, *, empresa_id: UUID, phone: str
+    ) -> Cliente | None:
+        """Return the first customer whose ``phone`` or ``whatsapp``
+        column matches ``phone`` (exact match, tenant-scoped).
+
+        Used by the WhatsApp integration to look up the customer
+        associated with an incoming message. The two columns are kept
+        in sync by the API; we check both to be robust to historical
+        data inconsistencies.
+        """
+        if not phone:
+            return None
+        result = await self._session.execute(
+            select(Cliente)
+            .where(
+                Cliente.empresa_id == empresa_id,
+                Cliente.deleted_at.is_(None),
+                or_(Cliente.phone == phone, Cliente.whatsapp == phone),
+            )
+            .order_by(Cliente.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_id(self, *, empresa_id: UUID, customer_id: UUID) -> Cliente | None:
         result = await self._session.execute(
             select(Cliente).where(

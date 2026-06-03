@@ -14,6 +14,7 @@ from app.modules.customers.router import router as customers_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.orders.router import router as orders_router
 from app.modules.products.router import router as products_router
+from app.modules.whatsapp.router import router as whatsapp_router
 from app.sales.api.router import router as sales_router
 
 api_router = APIRouter()
@@ -32,3 +33,4 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(sales_router, prefix="/sales", tags=["sales"])
 api_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_router.include_router(ai_live_router, prefix="/ai-live", tags=["ai-live"])
+api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
