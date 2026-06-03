@@ -77,24 +77,24 @@ class AIInsightsService:
             empresa_id=empresa_id, conversation_id=conversation_id
         )
 
-        from app.database.session import get_db_session
+        from app.database.session import AsyncSessionLocal
         from app.modules.conversations.repository import ConversationRepository as ConvRepo
 
-        session = await anext(get_db_session())
-        try:
+        async with AsyncSessionLocal() as session:
             conv_repo = ConvRepo(session=session)
-            conversation = await conv_repo.get_by_id(
+            conversation = await conv_repo.get_conversation_by_id(
                 empresa_id=empresa_id, conversation_id=conversation_id
             )
             if conversation:
-                messages = await conv_repo.list_messages(
-                    empresa_id=empresa_id, conversation_id=conversation_id
+                messages, _ = await conv_repo.list_messages(
+                    empresa_id=empresa_id,
+                    conversation_id=conversation_id,
+                    limit=200,
+                    offset=0,
                 )
-                msgs_list = [m async for m in messages]
+                msgs_list = list(messages)
             else:
                 msgs_list = []
-        finally:
-            await session.close()
 
         last_user_msg = ""
         last_interaction = None

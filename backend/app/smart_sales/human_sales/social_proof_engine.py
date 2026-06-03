@@ -55,7 +55,11 @@ USED_PROOFS: dict[str, set[int]] = defaultdict(set)
 
 class SocialProofEngine:
     def get_proof(self, product_category: str | None = None, conversation_id: str = "") -> str:
-        pool = CATEGORY_PROOF.get(product_category.lower()) if product_category else SOCIAL_PROOF_PHRASES
+        if product_category:
+            key = product_category.strip().lower()
+            pool = CATEGORY_PROOF[key] if key in CATEGORY_PROOF else SOCIAL_PROOF_PHRASES
+        else:
+            pool = SOCIAL_PROOF_PHRASES
 
         used = USED_PROOFS[conversation_id]
         available = [i for i in range(len(pool)) if i not in used]

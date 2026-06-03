@@ -26,7 +26,15 @@ def create_app() -> FastAPI:
                 "Continuing startup despite DB connection failure. "
                 "API will return 500 on database-dependent endpoints."
             )
+        # Register decoupled domain event listeners (inventory reacts to
+        # order.confirmed / order.cancelled).
+        from app.modules.inventory.listeners import register_inventory_listener
+
+        register_inventory_listener()
         yield
+        from app.modules.inventory.listeners import unregister_inventory_listener
+
+        unregister_inventory_listener()
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 

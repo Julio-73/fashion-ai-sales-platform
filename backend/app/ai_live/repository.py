@@ -28,6 +28,7 @@ class ConversationAIRepository:
             )
             self._session.add(state)
             await self._session.flush()
+            await self._session.refresh(state)
         return state
 
     async def update_state(
@@ -69,6 +70,7 @@ class ConversationAIRepository:
         state = await self.get_or_create_state(empresa_id=empresa_id, conversation_id=conversation_id)
         state.ai_enabled = enabled
         await self._session.flush()
+        await self._session.refresh(state)
         await self.add_event(
             empresa_id=empresa_id,
             conversation_id=conversation_id,
@@ -80,6 +82,7 @@ class ConversationAIRepository:
         state = await self.get_or_create_state(empresa_id=empresa_id, conversation_id=conversation_id)
         state.auto_reply_enabled = enabled
         await self._session.flush()
+        await self._session.refresh(state)
         return state
 
     async def add_event(
