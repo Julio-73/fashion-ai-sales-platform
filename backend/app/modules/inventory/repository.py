@@ -1,4 +1,4 @@
-"""Repository for the Inventory Management module."""
+﻿"""Repository for the Inventory Management module."""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -130,7 +130,7 @@ class InventoryRepository:
         items_total_q = select(func.count()).select_from(query.subquery())
         items_total = int((await self._session.execute(items_total_q)).scalar_one())
 
-        # Order by (defaults to name asc) — for numeric columns we cast.
+        # Order by (defaults to name asc) â€” for numeric columns we cast.
         sort_column = {
             "name": Producto.name,
             "stock_actual": func.coalesce(InventoryItem.stock_actual, 0),
@@ -438,6 +438,9 @@ class InventoryRepository:
     async def rollback(self) -> None:
         await self._session.rollback()
 
+    async def refresh(self, item) -> None:
+        await self._session.refresh(item)
+
     async def get_product_for_inventory(
         self, *, empresa_id: UUID, product_id: UUID
     ) -> Producto | None:
@@ -451,3 +454,4 @@ class InventoryRepository:
             )
         )
         return result.unique().scalar_one_or_none()
+

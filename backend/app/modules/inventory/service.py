@@ -147,6 +147,7 @@ class InventoryService:
             )
             item.last_movement_at = datetime.now(UTC)
         await self._repository.commit()
+        await self._repository.refresh(item)
         return self._build_item_response(item=item)
 
     async def create_reservation(
@@ -184,6 +185,7 @@ class InventoryService:
             ref_id=reservation.id,
         )
         await self._repository.commit()
+        await self._repository.refresh(reservation)
         return InventoryReservationResponse.model_validate(reservation)
 
     async def cancel_reservation(
@@ -221,6 +223,7 @@ class InventoryService:
             ref_id=reservation.id,
         )
         await self._repository.commit()
+        await self._repository.refresh(reservation)
         return InventoryReservationResponse.model_validate(reservation)
 
     async def get_metrics(self, *, tenant: TenantContext) -> InventoryAggregateMetrics:
