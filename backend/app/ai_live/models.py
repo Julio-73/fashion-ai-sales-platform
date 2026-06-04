@@ -16,7 +16,7 @@ class ConversationAIState(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base
 
     conversation_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
+        ForeignKey("conversations_core.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -40,7 +40,7 @@ class ConversationAIEvent(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base
 
     conversation_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
+        ForeignKey("conversations_core.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

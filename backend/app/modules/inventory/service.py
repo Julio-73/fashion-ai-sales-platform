@@ -52,6 +52,9 @@ class InventoryService:
         sort_by: InventorySortBy,
         sort_dir: str,
     ) -> InventoryListResponse:
+        # H-2: status is now applied at the SQL level by the repository.
+        # The result is already filtered + paged consistently; no need
+        # for a post-fetch filter that would break ``total``.
         rows, total = await self._repository.list_with_product(
             empresa_id=tenant.empresa_id,
             limit=limit,
@@ -63,8 +66,6 @@ class InventoryService:
             sort_dir=sort_dir,
         )
         items = [self._build_summary(product=product, item=item) for product, item in rows]
-        if status != "all":
-            items = [s for s in items if s.status == status]
         return InventoryListResponse(
             items=items, total=total, limit=limit, offset=offset
         )
@@ -247,6 +248,11 @@ class InventoryService:
         For confirmed orders, deduct stock and record a ``salida``
         movement per item. For cancelled orders, the reverse
         (``entrada``) — restoring previously deducted stock.
+
+        H-1: Batch-fetch all inventory rows for the items in a single
+        query, then auto-create the missing ones (still 1 INSERT per
+        missing item, no fan-out of SELECTs). Movements are queued and
+        flushed in a single round-trip.
         """
         if status == "confirmed":
             tipo = MovementType.SALIDA.value
@@ -257,6 +263,8 @@ class InventoryService:
         else:
             return
 
+        # Parse + validate all items first (no I/O).
+        valid_items: list[tuple[UUID, int]] = []
         for item in items:
             product_id = item.get("product_id")
             qty = int(item.get("quantity") or 0)
@@ -266,11 +274,61 @@ class InventoryService:
                 pid = UUID(str(product_id))
             except (TypeError, ValueError):
                 continue
-            await self._apply_order_movement(
+            valid_items.append((pid, qty))
+        if not valid_items:
+            return
+
+        # 1 SELECT for all items (H-1) instead of N.
+        product_ids = [pid for pid, _ in valid_items]
+        existing = await self._repository.get_items_for_products(
+            empresa_id=empresa_id, product_ids=product_ids
+        )
+        items_by_product: dict[UUID, Any] = {row.product_id: row for row in existing}
+
+        # Auto-create missing inventory rows in one pass.
+        for pid, _ in valid_items:
+            if pid not in items_by_product:
+                new_item = await self._repository.upsert_item(
+                    empresa_id=empresa_id,
+                    product_id=pid,
+                    stock_actual=0,
+                    stock_minimo=0,
+                )
+                items_by_product[pid] = new_item
+
+        # Apply movements and record them in batch.
+        movements_to_record: list[dict[str, Any]] = []
+        now = datetime.now(UTC)
+        for pid, qty in valid_items:
+            inv_item = items_by_product[pid]
+            if tipo == MovementType.SALIDA.value:
+                if inv_item.stock_actual < qty:
+                    logger.warning(
+                        "Insufficient stock for product %s (have %s, need %s). Clamping to available.",
+                        pid,
+                        inv_item.stock_actual,
+                        qty,
+                    )
+                    qty = max(0, inv_item.stock_actual)
+                if qty == 0:
+                    continue
+                inv_item.stock_actual = inv_item.stock_actual - qty
+            elif tipo == MovementType.ENTRADA.value:
+                inv_item.stock_actual = inv_item.stock_actual + qty
+            inv_item.last_movement_at = now
+            movements_to_record.append(
+                {
+                    "product_id": pid,
+                    "cantidad": qty,
+                }
+            )
+
+        for m in movements_to_record:
+            await self._repository.record_movement(
                 empresa_id=empresa_id,
-                product_id=pid,
+                product_id=m["product_id"],
                 tipo=tipo,
-                cantidad=qty,
+                cantidad=m["cantidad"],
                 motivo=motivo,
                 ref_type="order",
                 ref_id=order_id,

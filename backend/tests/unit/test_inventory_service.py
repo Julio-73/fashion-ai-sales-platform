@@ -89,16 +89,19 @@ class TestListInventory:
         assert result.total == 1
         repo.list_with_product.assert_awaited_once()
 
-    async def test_status_filter_applied_post_fetch(self) -> None:
+    async def test_status_filter_applied_at_repository(self) -> None:
+        # H-2: the repository now applies the status filter at SQL level.
+        # The service trusts the response and ``total`` reflects the
+        # filtered count (no post-fetch filtering).
         repo = AsyncMock()
+        # stock_actual=2, stock_minimo=10 -> classify_status returns "stock_bajo"
+        low_item = _summary("stock_bajo", stock_actual=2, stock_minimo=10, stock_reservado=0, stock_disponible=2)
         repo.list_with_product.return_value = (
             [
                 (SimpleNamespace(id=uuid4(), name="Low", category="x", base_price="1",
-                                 variants=[], images=[], updated_at=datetime.now(UTC)), _summary("stock_bajo")),
-                (SimpleNamespace(id=uuid4(), name="OK", category="x", base_price="1",
-                                 variants=[], images=[], updated_at=datetime.now(UTC)), _summary("normal")),
+                                 variants=[], images=[], updated_at=datetime.now(UTC)), low_item),
             ],
-            2,
+            1,
         )
         service = InventoryService(repository=repo)
         result = await service.list_inventory(
@@ -112,7 +115,10 @@ class TestListInventory:
             sort_dir="asc",
         )
         assert all(item.status == "stock_bajo" for item in result.items)
-        assert result.total == 2  # repo total is the unfiltered count
+        assert result.total == 1
+        # The repository must receive the status so it can filter at SQL.
+        call_kwargs = repo.list_with_product.await_args.kwargs
+        assert call_kwargs["status"] == "stock_bajo"
 
 
 class TestGetProductDetail:

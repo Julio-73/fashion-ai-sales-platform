@@ -41,6 +41,25 @@ class InventoryRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_items_for_products(
+        self, *, empresa_id: UUID, product_ids: Sequence[UUID],
+    ) -> Sequence[InventoryItem]:
+        """Batch lookup (H-1).
+
+        Returns the inventory rows for ``product_ids`` in a single query.
+        Used by ``handle_order_event`` so that processing a 10-item order
+        triggers 1 SELECT instead of N.
+        """
+        if not product_ids:
+            return []
+        result = await self._session.execute(
+            select(InventoryItem).where(
+                InventoryItem.empresa_id == empresa_id,
+                InventoryItem.product_id.in_(product_ids),
+            )
+        )
+        return result.scalars().all()
+
     async def get_item_or_404(
         self, *, empresa_id: UUID, product_id: UUID
     ) -> InventoryItem:
@@ -100,6 +119,23 @@ class InventoryRepository:
         sort_by: str,
         sort_dir: str,
     ) -> tuple[Sequence[tuple[Producto, InventoryItem | None]], int]:
+        # H-2: classify stock status in SQL so pagination is consistent
+        # and the ``total`` reflects the filtered count.
+        # classify_status in app/modules/inventory/schemas.py is:
+        #   stock_actual <= 0           -> 'agotado'
+        #   stock_actual <= stock_minimo -> 'stock_bajo'
+        #   else                        -> 'normal'
+        stock_actual = func.coalesce(InventoryItem.stock_actual, 0)
+        stock_minimo = func.coalesce(InventoryItem.stock_minimo, 0)
+        if status == "agotado":
+            status_filter = stock_actual <= 0
+        elif status == "stock_bajo":
+            status_filter = (stock_actual > 0) & (stock_actual <= stock_minimo)
+        elif status == "normal":
+            status_filter = stock_actual > stock_minimo
+        else:
+            status_filter = None
+
         query = (
             select(Producto, InventoryItem)
             .options(selectinload(Producto.variants), selectinload(Producto.images))
@@ -123,17 +159,17 @@ class InventoryRepository:
                     Producto.category.ilike(pattern),
                 )
             )
+        if status_filter is not None:
+            query = query.where(status_filter)
 
-        # Status filter is applied post-fetch because the classification
-        # is a Python expression (it depends on the comparison between
-        # stock_actual and stock_minimo).
+        # ``total`` now reflects the post-filter count (H-2).
         items_total_q = select(func.count()).select_from(query.subquery())
         items_total = int((await self._session.execute(items_total_q)).scalar_one())
 
         # Order by (defaults to name asc) â€” for numeric columns we cast.
         sort_column = {
             "name": Producto.name,
-            "stock_actual": func.coalesce(InventoryItem.stock_actual, 0),
+            "stock_actual": stock_actual,
             "stock_disponible": func.coalesce(InventoryItem.stock_actual - InventoryItem.stock_reservado, 0),
             "last_movement_at": InventoryItem.last_movement_at,
             "category": Producto.category,

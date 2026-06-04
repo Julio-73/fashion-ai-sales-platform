@@ -5,15 +5,39 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai_live.models import ConversationAIEvent, ConversationAIState
+from app.conversations.models import ConversationCore
+from app.core.errors import AppError
 
 
 class ConversationAIRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def _assert_conversation_exists(
+        self, *, conversation_id: UUID,
+    ) -> None:
+        """Defensive check (C-2).
+
+        Verify that ``conversation_id`` exists in ``conversations_core``
+        before any INSERT into AI Live tables. Defense-in-depth on top
+        of the DB-level FK added in migration 0014. Raises a controlled
+        ``AppError(404)`` instead of letting an ``IntegrityError``
+        surface as an unhandled 500.
+        """
+        result = await self._session.execute(
+            select(ConversationCore.id).where(ConversationCore.id == conversation_id)
+        )
+        if result.scalar_one_or_none() is None:
+            raise AppError(
+                code="conversation_not_found",
+                message="Conversation not found",
+                status_code=404,
+            )
+
     async def get_or_create_state(
         self, *, empresa_id: UUID, conversation_id: UUID,
     ) -> ConversationAIState:
+        await self._assert_conversation_exists(conversation_id=conversation_id)
         result = await self._session.execute(
             select(ConversationAIState).where(
                 ConversationAIState.empresa_id == empresa_id,
@@ -93,6 +117,7 @@ class ConversationAIRepository:
         event_type: str,
         payload: dict | None = None,
     ) -> ConversationAIEvent:
+        await self._assert_conversation_exists(conversation_id=conversation_id)
         event = ConversationAIEvent(
             empresa_id=empresa_id,
             conversation_id=conversation_id,

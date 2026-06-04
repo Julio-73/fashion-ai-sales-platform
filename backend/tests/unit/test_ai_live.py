@@ -54,9 +54,22 @@ def event_model():
 
 class TestConversationAIRepository:
     async def test_get_or_create_state_creates_new(self, mock_session):
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = mock_result
+        # After C-2, the repository first verifies the conversation exists
+        # in ``conversations_core`` (defensive check). The first SELECT
+        # returns a non-None sentinel; the second SELECT (the actual state
+        # lookup) returns None, which forces a create path.
+        exists_result = MagicMock()
+        exists_result.scalar_one_or_none.return_value = TEST_CONVERSATION_ID
+        state_result = MagicMock()
+        state_result.scalar_one_or_none.return_value = None
+
+        call_count = {"n": 0}
+
+        def side_effect(*args, **kwargs):
+            call_count["n"] += 1
+            return exists_result if call_count["n"] == 1 else state_result
+
+        mock_session.execute = AsyncMock(side_effect=side_effect)
 
         repo = ConversationAIRepository(session=mock_session)
         state = await repo.get_or_create_state(
@@ -68,10 +81,41 @@ class TestConversationAIRepository:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
 
+    async def test_get_or_create_state_raises_when_conversation_missing(
+        self, mock_session,
+    ):
+        # C-2: if the conversation does not exist, raise 404 instead of
+        # inserting an orphan reference.
+        from app.core.errors import AppError
+
+        missing = MagicMock()
+        missing.scalar_one_or_none.return_value = None
+        mock_session.execute = AsyncMock(return_value=missing)
+
+        repo = ConversationAIRepository(session=mock_session)
+        with pytest.raises(AppError) as exc:
+            await repo.get_or_create_state(
+                empresa_id=TEST_EMPRESA_ID, conversation_id=TEST_CONVERSATION_ID
+            )
+        assert exc.value.status_code == 404
+        assert exc.value.code == "conversation_not_found"
+        mock_session.add.assert_not_called()
+        mock_session.flush.assert_not_called()
+
     async def test_get_or_create_state_returns_existing(self, mock_session, state_model):
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = state_model
-        mock_session.execute.return_value = mock_result
+        # Defensive check returns a sentinel; subsequent lookup returns state.
+        exists_result = MagicMock()
+        exists_result.scalar_one_or_none.return_value = TEST_CONVERSATION_ID
+        state_result = MagicMock()
+        state_result.scalar_one_or_none.return_value = state_model
+
+        call_count = {"n": 0}
+
+        def side_effect(*args, **kwargs):
+            call_count["n"] += 1
+            return exists_result if call_count["n"] == 1 else state_result
+
+        mock_session.execute = AsyncMock(side_effect=side_effect)
 
         repo = ConversationAIRepository(session=mock_session)
         state = await repo.get_or_create_state(
@@ -127,6 +171,11 @@ class TestConversationAIRepository:
         assert state.auto_reply_enabled is True
 
     async def test_add_event(self, mock_session):
+        # C-2: add_event now also runs the defensive conversation check.
+        exists_result = MagicMock()
+        exists_result.scalar_one_or_none.return_value = TEST_CONVERSATION_ID
+        mock_session.execute = AsyncMock(return_value=exists_result)
+
         repo = ConversationAIRepository(session=mock_session)
         event = await repo.add_event(
             empresa_id=TEST_EMPRESA_ID,
@@ -166,9 +215,19 @@ class TestConversationAIRepository:
         assert len(events) == 1
 
     async def test_tenant_isolation(self, mock_session, state_model):
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = state_model
-        mock_session.execute.return_value = mock_result
+        # Defensive check returns sentinel; state lookup returns state_model.
+        exists_result = MagicMock()
+        exists_result.scalar_one_or_none.return_value = TEST_CONVERSATION_ID
+        state_result = MagicMock()
+        state_result.scalar_one_or_none.return_value = state_model
+
+        call_count = {"n": 0}
+
+        def side_effect(*args, **kwargs):
+            call_count["n"] += 1
+            return exists_result if call_count["n"] == 1 else state_result
+
+        mock_session.execute = AsyncMock(side_effect=side_effect)
 
         repo = ConversationAIRepository(session=mock_session)
         state = await repo.get_or_create_state(

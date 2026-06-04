@@ -108,6 +108,13 @@ class AIReplyService:
                 ai_last_response=ai_content,
             )
         except Exception:
-            logger.warning("Failed to update AI state for conversation=%s", conversation_id)
+            # C-3: never silently swallow FK / DB errors. Log with full
+            # traceback so operators can see the real cause. We still
+            # return the AI message because it was already persisted
+            # above; the metadata update is best-effort.
+            logger.exception(
+                "Failed to update AI live state metadata for conversation=%s",
+                conversation_id,
+            )
 
         return ai_message
