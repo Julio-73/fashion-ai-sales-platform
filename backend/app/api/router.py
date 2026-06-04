@@ -4,6 +4,7 @@ from app.ai.router import router as ai_router
 from app.ai_live.router import router as ai_live_router
 from app.api.routes.health import router as health_router
 from app.conversations.router import router as conversations_core_router
+from app.modules.admin.router import router as admin_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
 from app.modules.chats.router import router as chats_router
@@ -20,6 +21,7 @@ from app.sales.api.router import router as sales_router
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
+api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(companies_router, prefix="/companies", tags=["companies"])
 api_router.include_router(customers_router, prefix="/customers", tags=["customers"])
 api_router.include_router(crm_router, prefix="/crm", tags=["crm"])
