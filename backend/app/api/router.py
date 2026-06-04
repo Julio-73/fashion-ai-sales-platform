@@ -14,6 +14,7 @@ from app.modules.crm.router import router as crm_router
 from app.modules.customers.router import router as customers_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.orders.router import router as orders_router
+from app.modules.pipeline.router import router as pipeline_router
 from app.modules.products.router import router as products_router
 from app.modules.whatsapp.router import router as whatsapp_router
 from app.sales.api.router import router as sales_router
@@ -28,6 +29,7 @@ api_router.include_router(crm_router, prefix="/crm", tags=["crm"])
 api_router.include_router(inventory_router, prefix="/inventory", tags=["inventory"])
 api_router.include_router(products_router, prefix="/products", tags=["products"])
 api_router.include_router(orders_router, prefix="/orders", tags=["orders"])
+api_router.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
 api_router.include_router(chats_router, prefix="/chats", tags=["chats"])
 api_router.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
 api_router.include_router(conversations_core_router, prefix="/conversations-core", tags=["conversations-core"])

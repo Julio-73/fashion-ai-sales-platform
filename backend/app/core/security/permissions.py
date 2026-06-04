@@ -29,6 +29,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "whatsapp:read",
         "whatsapp:write",
         "whatsapp:admin",
+        "pipeline:read",
+        "pipeline:write",
+        "pipeline:metrics",
     },
     "admin": {
         "auth:me",
@@ -51,6 +54,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "whatsapp:read",
         "whatsapp:write",
         "whatsapp:admin",
+        "pipeline:read",
+        "pipeline:write",
+        "pipeline:metrics",
     },
     "sales_agent": {
         "auth:me",
@@ -69,6 +75,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "ai:respond",
         "whatsapp:read",
         "whatsapp:write",
+        "pipeline:read",
+        "pipeline:write",
+        "pipeline:metrics",
     },
     "analyst": {
         "auth:me",
@@ -79,6 +88,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "orders:read",
         "sales:read",
         "whatsapp:read",
+        "pipeline:read",
+        "pipeline:metrics",
     },
 }
 
