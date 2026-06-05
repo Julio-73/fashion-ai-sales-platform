@@ -52,11 +52,32 @@ class CustomerSummary(BaseModel):
     orders_count: int = 0
 
 
+def _clamp_0_100(v: object) -> int:
+    """Clamp an incoming value to the closed interval ``[0, 100]``.
+
+    Non-numeric values fall through to the standard ``Field(ge=0, le=100)``
+    check so the validator raises a meaningful ``ValidationError`` instead
+    of silently coercing.
+    """
+    if isinstance(v, bool):
+        # bool is a subclass of int — be explicit to avoid surprises.
+        return 100 if v else 0
+    if isinstance(v, (int, float)):
+        return max(0, min(100, int(v)))
+    return v  # type: ignore[return-value]
+
+
 class AIScoreBreakdown(BaseModel):
     """Decomposition of a commercial AI score.
 
     Each factor is a 0-100 sub-score. ``total`` is the weighted sum.
+
+    Out-of-range integers are **clamped** to ``[0, 100]`` (not rejected)
+    so that defensive construction (e.g. ``model_construct``) cannot leak
+    un-bounded values into API responses.
     """
+
+    model_config = ConfigDict()
 
     total: int = Field(ge=0, le=100)
     intent: int = Field(ge=0, le=100, default=0)
@@ -65,6 +86,14 @@ class AIScoreBreakdown(BaseModel):
     monetary: int = Field(ge=0, le=100, default=0)
     sentiment: int = Field(ge=0, le=100, default=50)
     rationale: list[str] = Field(default_factory=list)
+
+    @field_validator(
+        "total", "intent", "engagement", "recency", "monetary", "sentiment",
+        mode="before",
+    )
+    @classmethod
+    def _clamp_to_0_100(cls, v: object) -> object:
+        return _clamp_0_100(v)
 
 
 class PipelineItemBase(BaseModel):
@@ -161,6 +190,7 @@ class PipelineMetricsResponse(BaseModel):
     total_open: int
     total_closed_won: int
     total_closed_lost: int
+    new_leads: int = 0
     open_value: float
     weighted_open_value: float
     won_value: float

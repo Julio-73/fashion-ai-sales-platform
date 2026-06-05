@@ -31,6 +31,7 @@ from app.modules.pipeline import (
 from app.modules.pipeline.ai import (
     CommercialAI,
     _clamp,
+    _days_since,
     _engagement_score,
     _intent_score,
     _monetary_score,
@@ -137,7 +138,7 @@ def test_pipeline_item_move_stage_invalid() -> None:
 
 
 def test_ai_score_breakdown_clamped() -> None:
-    a = AIScoreBreakdown.model_construct(
+    a = AIScoreBreakdown(
         total=150, intent=-10, engagement=200, recency=50, monetary=50, sentiment=50, rationale=[]
     )
     assert a.total == 100
@@ -298,16 +299,16 @@ def _make_deal(**over: object) -> MagicMock:
     deal.estimated_value = Decimal("100")
     deal.probability = 30
     deal.stage = "qualified"
-    deal.stage_entered_at = datetime.utcnow()
-    deal.last_activity_at = datetime.utcnow()
+    deal.stage_entered_at = datetime.now(timezone.utc)
+    deal.last_activity_at = datetime.now(timezone.utc)
     deal.notes = None
     deal.won_reason = None
     deal.lost_reason = None
     deal.position = 0
     deal.channel = None
     deal.is_vip = False
-    deal.created_at = datetime.utcnow()
-    deal.updated_at = datetime.utcnow()
+    deal.created_at = datetime.now(timezone.utc)
+    deal.updated_at = datetime.now(timezone.utc)
     for k, v in over.items():
         setattr(deal, k, v)
     return deal
@@ -448,13 +449,16 @@ def _build_svc(mock_session: AsyncMock) -> PipelineService:
     return svc
 
 
-def _execute_result(*, rows=(), one=None) -> MagicMock:
+def _execute_result(*, rows=(), all=None, one=None, rowcount=0) -> MagicMock:
     r = MagicMock()
-    r.all = MagicMock(return_value=rows)
+    # ``all=`` accepts an iterable directly (e.g. [], list of tuples).
+    rows_iter = all if all is not None else rows
+    r.all = MagicMock(return_value=list(rows_iter))
+    r.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=rows_iter)))
     r.scalar = MagicMock(return_value=one)
     r.scalar_one_or_none = MagicMock(return_value=one)
     r.one = MagicMock(return_value=(one,) if one is not None else (0, 0))
-    r.rowcount = 0
+    r.rowcount = rowcount
     return r
 
 
@@ -479,7 +483,7 @@ async def test_service_create_succeeds(mock_session: AsyncMock) -> None:
 
 @pytest.mark.asyncio
 async def test_service_create_invalid_stage(mock_session: AsyncMock) -> None:
-    svc = _build_svc(mock_session)
+    _ = _build_svc(mock_session)  # noqa: F841 — service not used: validation happens at construction
     # Pydantic ValidationError on construction — service is never called.
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
@@ -608,7 +612,7 @@ async def test_service_recommendations_orders_desc(mock_session: AsyncMock) -> N
 @pytest.mark.asyncio
 async def test_automation_stuck_in_stage_triggers(mock_session: AsyncMock) -> None:
     deal = _make_deal(stage="contacted")
-    deal.stage_entered_at = datetime.utcnow() - timedelta(days=10)
+    deal.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=10)
     eng = AutomationEngine(mock_session)
     eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
     mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
@@ -620,7 +624,7 @@ async def test_automation_stuck_in_stage_triggers(mock_session: AsyncMock) -> No
 @pytest.mark.asyncio
 async def test_automation_vip_ignored(mock_session: AsyncMock) -> None:
     deal = _make_deal(stage="negotiation", is_vip=True)
-    deal.last_activity_at = datetime.utcnow() - timedelta(days=5)
+    deal.last_activity_at = datetime.now(timezone.utc) - timedelta(days=5)
     eng = AutomationEngine(mock_session)
     eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
     mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
@@ -631,8 +635,8 @@ async def test_automation_vip_ignored(mock_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_automation_no_alerts_for_fresh_deal(mock_session: AsyncMock) -> None:
     deal = _make_deal(stage="new_lead")
-    deal.stage_entered_at = datetime.utcnow()
-    deal.last_activity_at = datetime.utcnow()
+    deal.stage_entered_at = datetime.now(timezone.utc)
+    deal.last_activity_at = datetime.now(timezone.utc)
     eng = AutomationEngine(mock_session)
     eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
     mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
@@ -644,10 +648,10 @@ async def test_automation_no_alerts_for_fresh_deal(mock_session: AsyncMock) -> N
 async def test_automation_severity_ordering(mock_session: AsyncMock) -> None:
     # Two alerts: one critical (VIP), one info (budget share)
     deal_vip = _make_deal(stage="negotiation", is_vip=True, estimated_value=Decimal("100"))
-    deal_vip.last_activity_at = datetime.utcnow() - timedelta(days=5)
-    deal_vip.stage_entered_at = datetime.utcnow() - timedelta(days=2)
+    deal_vip.last_activity_at = datetime.now(timezone.utc) - timedelta(days=5)
+    deal_vip.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=2)
     deal_huge = _make_deal(stage="negotiation", estimated_value=Decimal("1000"))
-    deal_huge.stage_entered_at = datetime.utcnow() - timedelta(days=1)
+    deal_huge.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=1)
     eng = AutomationEngine(mock_session)
     eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
     mock_session.execute = AsyncMock(return_value=_execute_result(one=Decimal("1000")))
@@ -693,6 +697,10 @@ def _tenant_with_perms(perms: set[str]) -> TenantContext:
 
 def _build_app() -> FastAPI:
     app = FastAPI()
+    # Register AppError → HTTP mapping so permission_denied becomes 403
+    # in the TestClient response (not a re-raised exception).
+    from app.core.errors import register_exception_handlers
+    register_exception_handlers(app)
     app.include_router(pipeline_router, prefix="/pipeline")
     return app
 
@@ -707,14 +715,17 @@ def _override(app: FastAPI, perms: set[str], svc: PipelineService) -> None:
     async def _db():
         yield svc.session  # type: ignore[attr-defined]
 
-    app.dependency_overrides[deps.PipelineReadContext] = _ctx
-    app.dependency_overrides[deps.PipelineWriteContext] = _ctx
-    app.dependency_overrides[deps.PipelineMetricsContext] = _ctx
+    app.dependency_overrides[deps.pipeline_read_dep] = _ctx
+    app.dependency_overrides[deps.pipeline_write_dep] = _ctx
+    app.dependency_overrides[deps.pipeline_metrics_dep] = _ctx
     app.dependency_overrides[deps.DB] = _db
 
 
 def test_api_stages_returns_seven() -> None:
     app = _build_app()
+    svc = MagicMock()
+    svc.session = AsyncMock()
+    _override(app, {"pipeline:read"}, svc)
     with TestClient(app) as c:
         r = c.get("/pipeline/stages")
         assert r.status_code == 200
@@ -731,8 +742,8 @@ def test_api_metrics_payload_shape() -> None:
     async def _db():
         yield MagicMock()
     from app.modules.pipeline import dependencies as deps
-    app.dependency_overrides[deps.PipelineReadContext] = _ctx
-    app.dependency_overrides[deps.PipelineMetricsContext] = _ctx
+    app.dependency_overrides[deps.pipeline_read_dep] = _ctx
+    app.dependency_overrides[deps.pipeline_metrics_dep] = _ctx
     app.dependency_overrides[deps.DB] = _db
     # Patch the actual service
     fake = MagicMock()
@@ -755,21 +766,46 @@ def test_api_metrics_payload_shape() -> None:
             assert "by_stage" in j
 
 
+def _make_fake_deal_response():
+    from app.modules.pipeline.schemas import PipelineItemResponse
+    return PipelineItemResponse(
+        id=uuid4(),
+        empresa_id=TEST_EMPRESA_ID,
+        customer_id=None,
+        conversation_id=None,
+        order_id=None,
+        title="Test",
+        estimated_value=Decimal("100"),
+        probability=30,
+        stage="qualified",
+        stage_entered_at=datetime.now(timezone.utc),
+        last_activity_at=datetime.now(timezone.utc),
+        notes=None,
+        won_reason=None,
+        lost_reason=None,
+        position=0,
+        channel=None,
+        is_vip=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        customer=None,
+        ai_score=None,
+    )
+
+
 def test_api_create_returns_201() -> None:
     app = _build_app()
     fake = MagicMock()
     fake.session = AsyncMock()
-    fake.create = AsyncMock(
-        return_value=SimpleNamespace(id=str(uuid4()), customer=None, ai_score=None)
-    )
+    fake.create = AsyncMock(return_value=_make_fake_deal_response())
     with patch("app.modules.pipeline.router.PipelineService", return_value=fake):
         async def _ctx() -> TenantContext:
             return _tenant_with_perms({"pipeline:read", "pipeline:write"})
         async def _db():
             yield MagicMock()
         from app.modules.pipeline import dependencies as deps
-        app.dependency_overrides[deps.PipelineReadContext] = _ctx
-        app.dependency_overrides[deps.PipelineWriteContext] = _ctx
+        app.dependency_overrides[deps.pipeline_read_dep] = _ctx
+        app.dependency_overrides[deps.pipeline_write_dep] = _ctx
         app.dependency_overrides[deps.DB] = _db
         with TestClient(app) as c:
             r = c.post(
@@ -790,8 +826,8 @@ def test_api_delete_returns_204() -> None:
         async def _db():
             yield MagicMock()
         from app.modules.pipeline import dependencies as deps
-        app.dependency_overrides[deps.PipelineReadContext] = _ctx
-        app.dependency_overrides[deps.PipelineWriteContext] = _ctx
+        app.dependency_overrides[deps.pipeline_read_dep] = _ctx
+        app.dependency_overrides[deps.pipeline_write_dep] = _ctx
         app.dependency_overrides[deps.DB] = _db
         with TestClient(app) as c:
             r = c.delete(f"/pipeline/deals/{uuid4()}")
@@ -800,12 +836,18 @@ def test_api_delete_returns_204() -> None:
 
 def test_api_forbidden_without_pipeline_read() -> None:
     app = _build_app()
+    # Only override get_tenant_context — the permission check inside
+    # pipeline_read_dep must still run, and must raise 403 for a
+    # context that lacks the "pipeline:read" permission.
+    from app.core.security import dependencies as core_deps
+    from app.modules.pipeline import dependencies as deps
+
     async def _ctx() -> TenantContext:
         return _tenant_with_perms(set())  # no permissions
+
+    app.dependency_overrides[core_deps.get_tenant_context] = _ctx
     async def _db():
         yield MagicMock()
-    from app.modules.pipeline import dependencies as deps
-    app.dependency_overrides[deps.PipelineReadContext] = _ctx
     app.dependency_overrides[deps.DB] = _db
     with TestClient(app) as c:
         r = c.get("/pipeline/stages")
@@ -822,3 +864,413 @@ def test_asyncio_smoke() -> None:
         await asyncio.sleep(0)
         return 1
     assert asyncio.run(_go()) == 1
+
+
+# ===========================================================================
+# FASE 10 — NEW UNIT TESTS
+# Targets: new automation rules, new rationale templates, AIScoreBreakdown
+# clamp at boundaries, schema defaults, and edge cases for the helpers.
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# AIScoreBreakdown clamping (FASE 2 — clamp validator)
+# ---------------------------------------------------------------------------
+def test_ai_score_breakdown_clamps_floats() -> None:
+    a = AIScoreBreakdown(
+        total=49.7, intent=100.2, engagement=0.0,
+        recency=-0.1, monetary=50.5, sentiment=150,
+    )
+    assert a.total == 49  # int truncation on a float
+    assert a.intent == 100
+    assert a.engagement == 0
+    assert a.recency == 0
+    assert a.monetary == 50
+    assert a.sentiment == 100
+
+
+def test_ai_score_breakdown_clamps_bool_to_extremes() -> None:
+    a = AIScoreBreakdown(total=True, intent=False)  # bool is a subclass of int
+    assert a.total == 100
+    assert a.intent == 0
+
+
+def test_ai_score_breakdown_negative_total_clamps_to_zero() -> None:
+    a = AIScoreBreakdown(total=-10, intent=0, engagement=0, recency=0, monetary=0)
+    assert a.total == 0
+
+
+# ---------------------------------------------------------------------------
+# _days_since helper
+# ---------------------------------------------------------------------------
+def test_days_since_returns_zero_for_none() -> None:
+    assert _days_since(None, datetime.now(timezone.utc)) == 0
+
+
+def test_days_since_returns_zero_for_future() -> None:
+    future = datetime.now(timezone.utc) + timedelta(days=5)
+    assert _days_since(future, datetime.now(timezone.utc)) == 0
+
+
+def test_days_since_rounds_down_to_full_days() -> None:
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    when = now - timedelta(hours=23)
+    assert _days_since(when, now) == 0
+    when = now - timedelta(hours=25)
+    assert _days_since(when, now) == 1
+
+
+# ---------------------------------------------------------------------------
+# New automation rules (FASE 8)
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_automation_no_activity_48h_triggers(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="contacted")
+    deal.last_activity_at = datetime.now(timezone.utc) - timedelta(hours=49)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    rules = [a.rule for a in alerts]
+    assert "NO_ACTIVITY_48H" in rules
+    assert all(a.severity == "warning" for a in alerts if a.rule == "NO_ACTIVITY_48H")
+
+
+@pytest.mark.asyncio
+async def test_automation_no_activity_48h_skips_fresh_deal(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="contacted")
+    deal.last_activity_at = datetime.now(timezone.utc) - timedelta(hours=10)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    assert "NO_ACTIVITY_48H" not in [a.rule for a in alerts]
+
+
+@pytest.mark.asyncio
+async def test_automation_no_activity_48h_skips_closed_deals(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="won")
+    deal.last_activity_at = datetime.now(timezone.utc) - timedelta(hours=72)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    assert "NO_ACTIVITY_48H" not in [a.rule for a in alerts]
+
+
+@pytest.mark.asyncio
+async def test_automation_negotiation_stuck_7d_triggers(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="negotiation")
+    deal.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=8)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    rules = [a.rule for a in alerts]
+    assert "NEGOTIATION_STUCK_7D" in rules
+
+
+@pytest.mark.asyncio
+async def test_automation_negotiation_stuck_critical_after_14d(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="negotiation")
+    deal.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=15)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    crit = [a for a in alerts if a.rule == "NEGOTIATION_STUCK_7D"]
+    assert crit
+    assert crit[0].severity == "critical"
+
+
+@pytest.mark.asyncio
+async def test_automation_negotiation_stuck_only_for_negotiation(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="proposal")
+    deal.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=10)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    assert "NEGOTIATION_STUCK_7D" not in [a.rule for a in alerts]
+
+
+@pytest.mark.asyncio
+async def test_automation_won_deal_recent(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="won", won_reason="Fit perfecto")
+    deal.updated_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    won = [a for a in alerts if a.rule == "WON_DEAL"]
+    assert won
+    assert "Fit perfecto" in won[0].message
+
+
+@pytest.mark.asyncio
+async def test_automation_won_deal_old_does_not_trigger(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="won")
+    deal.updated_at = datetime.now(timezone.utc) - timedelta(days=2)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    assert "WON_DEAL" not in [a.rule for a in alerts]
+
+
+@pytest.mark.asyncio
+async def test_automation_lost_deal_recent(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="lost", lost_reason="Precio alto")
+    deal.updated_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    eng = AutomationEngine(mock_session)
+    eng.ai.score_deal = AsyncMock(return_value=(10, None, []))
+    mock_session.execute = AsyncMock(return_value=_execute_result(one=0))
+    alerts = await eng.evaluate(TEST_EMPRESA_ID, [deal])
+    lost = [a for a in alerts if a.rule == "LOST_DEAL"]
+    assert lost
+    assert "Precio alto" in lost[0].message
+
+
+# ---------------------------------------------------------------------------
+# New rationale templates (FASE 4)
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_rationale_recurrent_buyer_above_3_orders(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="qualified")
+    # _order_stats queries by customer full_name → fake it via a MagicMock that
+    # returns a 1-tuple of (count, ltv).
+    ai = CommercialAI(mock_session)
+    ai._customer = AsyncMock(return_value=SimpleNamespace(
+        full_name="Jane Doe", priority="warm", lead_score=50,
+        conversation_count=2, last_interaction_at=datetime.now(timezone.utc),
+    ))
+    ai._ai_state = AsyncMock(return_value=None)
+    ai._order_stats = AsyncMock(return_value=(5, Decimal("1500")))  # 5 orders
+    total, breakdown, rationale = await ai.score_deal(deal)
+    assert any("historial de compras recurrentes" in r for r in rationale)
+
+
+@pytest.mark.asyncio
+async def test_rationale_vip_candidate_for_high_value_recurrent(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="negotiation", estimated_value=Decimal("5000"))
+    ai = CommercialAI(mock_session)
+    ai._customer = AsyncMock(return_value=SimpleNamespace(
+        full_name="VIP Buyer", priority="warm", lead_score=70,
+        conversation_count=3, last_interaction_at=datetime.now(timezone.utc),
+    ))
+    ai._ai_state = AsyncMock(return_value=None)
+    ai._order_stats = AsyncMock(return_value=(4, Decimal("2000")))
+    total, breakdown, rationale = await ai.score_deal(deal)
+    assert any("VIP" in r for r in rationale)
+
+
+@pytest.mark.asyncio
+async def test_rationale_stuck_in_negotiation_after_7d(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="negotiation")
+    deal.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=10)
+    ai = CommercialAI(mock_session)
+    ai._customer = AsyncMock(return_value=None)
+    ai._ai_state = AsyncMock(return_value=None)
+    ai._order_stats = AsyncMock(return_value=(0, Decimal("0")))
+    total, breakdown, rationale = await ai.score_deal(deal)
+    assert any("estancado en negociación" in r for r in rationale)
+
+
+@pytest.mark.asyncio
+async def test_rationale_followup_after_5_days_silent(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="contacted")
+    ai = CommercialAI(mock_session)
+    ai._customer = AsyncMock(return_value=SimpleNamespace(
+        full_name="Quiet Buyer", priority="cold", lead_score=20,
+        conversation_count=1,
+        last_interaction_at=datetime.now(timezone.utc) - timedelta(days=8),
+    ))
+    ai._ai_state = AsyncMock(return_value=None)
+    ai._order_stats = AsyncMock(return_value=(0, Decimal("0")))
+    total, breakdown, rationale = await ai.score_deal(deal)
+    assert any("sin seguimiento" in r for r in rationale)
+
+
+@pytest.mark.asyncio
+async def test_rationale_high_intent_intent_string(mock_session: AsyncMock) -> None:
+    deal = _make_deal(stage="qualified")
+    ai = CommercialAI(mock_session)
+    ai._customer = AsyncMock(return_value=SimpleNamespace(
+        full_name="Buyer", priority="warm", lead_score=70,
+        conversation_count=2, last_interaction_at=datetime.now(timezone.utc),
+    ))
+    ai._ai_state = AsyncMock(return_value=SimpleNamespace(
+        last_detected_intent="buy_now", sentiment="positive",
+        urgency_score=0.7, lead_temperature="hot", escalation_required=False,
+    ))
+    ai._order_stats = AsyncMock(return_value=(0, Decimal("0")))
+    total, breakdown, rationale = await ai.score_deal(deal)
+    assert any("alta intención de compra" in r for r in rationale)
+
+
+# ---------------------------------------------------------------------------
+# Schemas — defaults and validators
+# ---------------------------------------------------------------------------
+def test_pipeline_metrics_response_new_leads_default() -> None:
+    """The new_leads field is optional with default 0 in the response."""
+    from app.modules.pipeline.schemas import PipelineMetricsResponse
+    m = PipelineMetricsResponse(
+        total_open=0,
+        total_closed_won=0,
+        total_closed_lost=0,
+        open_value=0.0,
+        weighted_open_value=0.0,
+        won_value=0.0,
+        lost_value=0.0,
+        conversion_rate_pct=0.0,
+        average_deal_value=0.0,
+        average_time_to_close_days=0.0,
+        average_time_in_current_stage_days=0.0,
+        oldest_unstuck_days=0,
+        alerts_count=0,
+        by_stage={},
+        by_channel={},
+        by_priority={},
+    )
+    assert m.new_leads == 0
+
+
+def test_pipeline_item_create_default_stage() -> None:
+    payload = PipelineItemCreate(title="Hi")
+    assert payload.stage == "new_lead"
+    assert payload.estimated_value == Decimal("0")
+
+
+def test_pipeline_item_update_omits_unchanged() -> None:
+    payload = PipelineItemUpdate()
+    assert payload.model_dump(exclude_unset=True) == {}
+
+
+def test_pipeline_item_move_stage_requires_target() -> None:
+    with pytest.raises(ValueError):
+        PipelineItemMoveStage(target_stage="banana")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Stage catalog — verify the 7 stages + ordering invariants
+# ---------------------------------------------------------------------------
+def test_stage_catalog_has_seven_stages_in_order() -> None:
+    keys = [s.key for s in STAGE_CATALOG]
+    assert keys == [
+        "new_lead", "contacted", "qualified", "proposal",
+        "negotiation", "won", "lost",
+    ]
+
+
+def test_stage_catalog_open_and_terminal_flags_consistent() -> None:
+    open_stages = {s.key for s in STAGE_CATALOG if s.is_open}
+    terminal_stages = {s.key for s in STAGE_CATALOG if s.is_terminal}
+    assert open_stages == {"new_lead", "contacted", "qualified", "proposal", "negotiation"}
+    assert terminal_stages == {"won", "lost"}
+    assert open_stages.isdisjoint(terminal_stages)
+    assert open_stages | terminal_stages == set(PIPELINE_STAGE_VALUES)
+
+
+def test_stage_catalog_default_probabilities_in_range() -> None:
+    for s in STAGE_CATALOG:
+        assert 0 <= s.default_probability <= 100, s.key
+
+
+# ---------------------------------------------------------------------------
+# is_valid_stage helper
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("stage", list(PIPELINE_STAGE_VALUES))
+def test_is_valid_stage_accepts_known(stage: str) -> None:
+    assert is_valid_stage(stage)
+
+
+@pytest.mark.parametrize("stage", ["banana", "WON", "Won", "", "  "])
+def test_is_valid_stage_rejects_unknown(stage: str) -> None:
+    assert not is_valid_stage(stage)
+
+
+# ---------------------------------------------------------------------------
+# Repository — count_by_stage and sum_value_by_stage
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_repository_count_by_stage_empty(mock_session: AsyncMock) -> None:
+    mock_session.execute = AsyncMock(return_value=_execute_result(all=[]))
+    repo = PipelineRepository(mock_session)
+    out = await repo.count_by_stage(TEST_EMPRESA_ID)
+    assert out == {}
+
+
+@pytest.mark.asyncio
+async def test_repository_sum_value_by_stage_empty(mock_session: AsyncMock) -> None:
+    mock_session.execute = AsyncMock(return_value=_execute_result(all=[]))
+    repo = PipelineRepository(mock_session)
+    out = await repo.sum_value_by_stage(TEST_EMPRESA_ID)
+    assert out == {}
+
+
+@pytest.mark.asyncio
+async def test_repository_delete_for_empresa_returns_count(mock_session: AsyncMock) -> None:
+    mock_session.execute = AsyncMock(return_value=_execute_result(rowcount=7))
+    repo = PipelineRepository(mock_session)
+    n = await repo.delete_for_empresa(TEST_EMPRESA_ID)
+    assert n == 7
+
+
+# ---------------------------------------------------------------------------
+# Service — recommendations ordering by score desc
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_service_recommendations_includes_zero_score(mock_session: AsyncMock) -> None:
+    from app.modules.pipeline.schemas import PipelineRecommendation
+    svc = _build_svc(mock_session)
+    deals = [_make_deal(stage="new_lead"), _make_deal(stage="won")]
+    svc.repo.list_items = AsyncMock(return_value=deals)
+    bd = AIScoreBreakdown(total=50, intent=50, engagement=50, recency=50, monetary=50)
+    svc.ai.recommend = AsyncMock(side_effect=[
+        PipelineRecommendation(
+            deal_id=deals[0].id, score=0, breakdown=bd,
+            next_best_action="x", suggested_channel=None,
+            suggested_stage=None, notes=[],
+        ),
+        PipelineRecommendation(
+            deal_id=deals[1].id, score=50, breakdown=bd,
+            next_best_action="y", suggested_channel=None,
+            suggested_stage=None, notes=[],
+        ),
+    ])
+    r = await svc.recommendations(TEST_EMPRESA_ID)
+    assert r.total == 2
+    # First should be the higher score.
+    assert r.recommendations[0].score == 50
+
+
+# ---------------------------------------------------------------------------
+# Schema — won/lost reasons in MoveStage
+# ---------------------------------------------------------------------------
+def test_pipeline_item_move_stage_won_carries_reason() -> None:
+    p = PipelineItemMoveStage(target_stage="won", won_reason="Fit perfecto")
+    assert p.target_stage == "won"
+    assert p.won_reason == "Fit perfecto"
+
+
+def test_pipeline_item_move_stage_lost_carries_reason() -> None:
+    p = PipelineItemMoveStage(target_stage="lost", lost_reason="Precio alto")
+    assert p.target_stage == "lost"
+    assert p.lost_reason == "Precio alto"
+
+
+# ---------------------------------------------------------------------------
+# Permission roles — analyst cannot write
+# ---------------------------------------------------------------------------
+def test_analyst_has_read_but_not_write() -> None:
+    from app.core.security.permissions import ROLE_PERMISSIONS
+    perms = ROLE_PERMISSIONS["analyst"]
+    assert "pipeline:read" in perms
+    assert "pipeline:metrics" in perms
+    assert "pipeline:write" not in perms
+
+
+def test_owner_has_all_three_pipeline_permissions() -> None:
+    from app.core.security.permissions import ROLE_PERMISSIONS
+    perms = ROLE_PERMISSIONS["owner"]
+    assert {"pipeline:read", "pipeline:write", "pipeline:metrics"} <= perms

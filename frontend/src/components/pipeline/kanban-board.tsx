@@ -38,7 +38,11 @@ const RULE_LABEL: Record<string, string> = {
   COLD_LEAD: "Lead frío",
   VIP_IGNORED: "VIP olvidado",
   HIGH_INTENT_SILENT: "Score alto sin mover",
-  NEAR_BUDGET_OVERFLOW: "Concentración de valor"
+  NEAR_BUDGET_OVERFLOW: "Concentración de valor",
+  NO_ACTIVITY_48H: "Sin actividad 48 h",
+  NEGOTIATION_STUCK_7D: "Estancado en negociación",
+  WON_DEAL: "Deal ganado",
+  LOST_DEAL: "Deal perdido"
 };
 
 export function KanbanBoard() {

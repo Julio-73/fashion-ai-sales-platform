@@ -35,7 +35,11 @@ export type AlertRule =
   | "COLD_LEAD"
   | "VIP_IGNORED"
   | "HIGH_INTENT_SILENT"
-  | "NEAR_BUDGET_OVERFLOW";
+  | "NEAR_BUDGET_OVERFLOW"
+  | "NO_ACTIVITY_48H"
+  | "NEGOTIATION_STUCK_7D"
+  | "WON_DEAL"
+  | "LOST_DEAL";
 
 export type PipelineStageInfo = {
   key: PipelineStageKey;
@@ -124,6 +128,7 @@ export type PipelineMetrics = {
   total_open: number;
   total_closed_won: number;
   total_closed_lost: number;
+  new_leads: number;
   open_value: number;
   weighted_open_value: number;
   won_value: number;

@@ -4,15 +4,19 @@ We intentionally do NOT install DB triggers. Rules run on demand from
 ``/pipeline/alerts`` and are also re-evaluated on stage moves.
 
 Rules implemented:
-    STUCK_IN_STAGE       — open deal > 7 days in same stage
-    COLD_LEAD            — no interaction in 14+ days and still open
-    VIP_IGNORED          — VIP deal with no activity in 3 days
-    HIGH_INTENT_SILENT   — AI score >= 75 but no movement in 5 days
-    NEAR_BUDGET_OVERFLOW — single deal >= 50% of total open value
+    STUCK_IN_STAGE        — open deal > 7 days in same stage
+    COLD_LEAD             — no interaction in 14+ days and still open
+    VIP_IGNORED           — VIP deal with no activity in 3 days
+    HIGH_INTENT_SILENT    — AI score >= 75 but no movement in 5 days
+    NEAR_BUDGET_OVERFLOW  — single deal >= 50% of total open value
+    NO_ACTIVITY_48H       — open deal with last_activity_at > 48 h ago
+    NEGOTIATION_STUCK_7D  — open deal in 'negotiation' > 7 days
+    WON_DEAL              — fired when a deal moves to 'won' (info)
+    LOST_DEAL             — fired when a deal moves to 'lost' (info)
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Iterable
 from uuid import UUID, uuid4
@@ -22,7 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.customers.models import Cliente
 from app.modules.pipeline.ai import CommercialAI
-from app.modules.pipeline.models import OPEN_STAGES, SalesPipelineItem
+from app.modules.pipeline.models import (
+    CLOSED_STAGES,
+    LOST_STAGE,
+    OPEN_STAGES,
+    WON_STAGE,
+    SalesPipelineItem,
+)
 from app.modules.pipeline.schemas import PipelineAlert
 
 
@@ -36,6 +46,8 @@ COLD_DAYS = 14
 VIP_IDLE_DAYS = 3
 HIGH_INTENT_IDLE_DAYS = 5
 NEAR_BUDGET_SHARE = 0.5
+NO_ACTIVITY_HOURS = 48
+NEGOTIATION_STUCK_DAYS = 7
 
 
 class AutomationEngine:
@@ -173,6 +185,138 @@ class AutomationEngine:
             created_at=now,
         )
 
+    async def _no_activity_48h(
+        self,
+        deal: SalesPipelineItem,
+        now: datetime,
+    ) -> PipelineAlert | None:
+        """FASE 8 — open deal with no activity in the last 48 h.
+
+        Distinct from ``COLD_LEAD`` (which uses ``Cliente.last_interaction_at``
+        at 14 days) and from ``STUCK_IN_STAGE`` (which uses
+        ``stage_entered_at``). This rule uses the deal's own
+        ``last_activity_at`` and the shorter 48 h window, so it's the
+        "first alarm" for a deal that just went silent.
+        """
+        if deal.stage not in OPEN_STAGES:
+            return None
+        hours = (now - deal.last_activity_at).total_seconds() / 3600.0
+        if hours < NO_ACTIVITY_HOURS:
+            return None
+        return PipelineAlert(
+            id=str(uuid4()),
+            deal_id=deal.id,
+            deal_title=deal.title,
+            customer_id=deal.customer_id,
+            rule="NO_ACTIVITY_48H",
+            severity=SEVERITY_WARNING,
+            message=(
+                f"Sin actividad en el deal desde hace {int(hours)} h."
+            ),
+            suggested_action=(
+                "Contactar hoy por WhatsApp o llamada y registrar la "
+                "interacción en el deal."
+            ),
+            stage=deal.stage,
+            days_in_stage=int(hours // 24),
+            created_at=now,
+        )
+
+    async def _negotiation_stuck_7d(
+        self,
+        deal: SalesPipelineItem,
+        now: datetime,
+    ) -> PipelineAlert | None:
+        """FASE 8 — deal stuck in 'negotiation' for more than 7 days."""
+        if deal.stage != "negotiation":
+            return None
+        days = (now - deal.stage_entered_at).days
+        if days < NEGOTIATION_STUCK_DAYS:
+            return None
+        return PipelineAlert(
+            id=str(uuid4()),
+            deal_id=deal.id,
+            deal_title=deal.title,
+            customer_id=deal.customer_id,
+            rule="NEGOTIATION_STUCK_7D",
+            severity=SEVERITY_CRITICAL if days >= 14 else SEVERITY_WARNING,
+            message=(
+                f"Deal lleva {days} días en 'negotiation' sin cerrar."
+            ),
+            suggested_action=(
+                "Revisar objeciones pendientes, ofrecer cierre con descuento "
+                "limitado o escalar a un senior."
+            ),
+            stage=deal.stage,
+            days_in_stage=days,
+            created_at=now,
+        )
+
+    async def _won_deal(
+        self,
+        deal: SalesPipelineItem,
+        now: datetime,
+    ) -> PipelineAlert | None:
+        """FASE 8 — fired for deals that just landed on 'won' (terminal).
+
+        We do not raise a warning; the activity registration is a fact
+        recorded in the move-stage flow (see ``service.move_stage``).
+        The alert is informational so dashboards can show a "newly
+        won" stream.
+        """
+        if deal.stage != WON_STAGE:
+            return None
+        # Only flag deals that closed very recently (last 24 h).
+        if (now - deal.updated_at).total_seconds() > 86400:
+            return None
+        return PipelineAlert(
+            id=str(uuid4()),
+            deal_id=deal.id,
+            deal_title=deal.title,
+            customer_id=deal.customer_id,
+            rule="WON_DEAL",
+            severity=SEVERITY_INFO,
+            message=(
+                f"Deal ganado. Motivo: {deal.won_reason or 'no registrado'}."
+            ),
+            suggested_action=(
+                "Iniciar onboarding, enviar confirmación al cliente y "
+                "mover el contacto a la lista de clientes activos."
+            ),
+            stage=deal.stage,
+            days_in_stage=0,
+            created_at=now,
+        )
+
+    async def _lost_deal(
+        self,
+        deal: SalesPipelineItem,
+        now: datetime,
+    ) -> PipelineAlert | None:
+        """FASE 8 — fired for deals that just landed on 'lost' (terminal)."""
+        if deal.stage != LOST_STAGE:
+            return None
+        if (now - deal.updated_at).total_seconds() > 86400:
+            return None
+        return PipelineAlert(
+            id=str(uuid4()),
+            deal_id=deal.id,
+            deal_title=deal.title,
+            customer_id=deal.customer_id,
+            rule="LOST_DEAL",
+            severity=SEVERITY_INFO,
+            message=(
+                f"Deal perdido. Motivo: {deal.lost_reason or 'no registrado'}."
+            ),
+            suggested_action=(
+                "Registrar motivo en CRM, agendar reactivación a 60 días "
+                "y archivar la conversación."
+            ),
+            stage=deal.stage,
+            days_in_stage=0,
+            created_at=now,
+        )
+
     async def _sum_open_value(self, empresa_id: UUID) -> Decimal:
         stmt = select(
             func.coalesce(func.sum(SalesPipelineItem.estimated_value), 0)
@@ -197,7 +341,7 @@ class AutomationEngine:
     async def evaluate(
         self, empresa_id: UUID, deals: list[SalesPipelineItem]
     ) -> list[PipelineAlert]:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         total_open_value = await self._sum_open_value(empresa_id)
         customers = await self._load_customers(
             [d.customer_id for d in deals if d.customer_id]
@@ -211,6 +355,10 @@ class AutomationEngine:
                 lambda: self._vip_ignored(d, now),
                 lambda: self._high_intent_silent(d, now),
                 lambda: self._near_budget_overflow(d, total_open_value, now),
+                lambda: self._no_activity_48h(d, now),
+                lambda: self._negotiation_stuck_7d(d, now),
+                lambda: self._won_deal(d, now),
+                lambda: self._lost_deal(d, now),
             ):
                 try:
                     a = await fn()
@@ -231,6 +379,8 @@ __all__ = [
     "VIP_IDLE_DAYS",
     "HIGH_INTENT_IDLE_DAYS",
     "NEAR_BUDGET_SHARE",
+    "NO_ACTIVITY_HOURS",
+    "NEGOTIATION_STUCK_DAYS",
     "SEVERITY_INFO",
     "SEVERITY_WARNING",
     "SEVERITY_CRITICAL",

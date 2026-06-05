@@ -425,6 +425,7 @@ class PipelineService:
             total_open=total_open,
             total_closed_won=total_won,
             total_closed_lost=total_lost,
+            new_leads=counts.get("new_lead", 0),
             open_value=round(open_value, 2),
             weighted_open_value=round(agg["weighted_open"], 2),
             won_value=round(won_value, 2),

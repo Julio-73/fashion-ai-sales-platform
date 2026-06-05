@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -128,6 +128,16 @@ def _engagement_score(conv_count: int, urgency: float | None) -> int:
     return _clamp(base)
 
 
+def _days_since(when: datetime | None, now: datetime) -> int:
+    """Whole calendar days between ``when`` and ``now``. ``0`` if missing."""
+    if when is None:
+        return 0
+    delta = now - when
+    if delta.total_seconds() <= 0:
+        return 0
+    return int(delta.total_seconds() // 86_400)
+
+
 # ---------------------------------------------------------------------------
 # Data classes used by the service layer
 # ---------------------------------------------------------------------------
@@ -202,7 +212,7 @@ class CommercialAI:
             ai_state=ai_state,
             orders_count=orders_count,
             lifetime_value=ltv,
-            now=datetime.utcnow(),
+            now=datetime.now(timezone.utc),
         )
 
     # ------------------------------------------------------------------
@@ -238,7 +248,7 @@ class CommercialAI:
 
         rationale: list[str] = []
         if intent >= 70:
-            rationale.append("Intención de compra detectada en la conversación")
+            rationale.append("Cliente con alta intención de compra")
         elif intent <= 30:
             rationale.append("Intención de compra débil o inexistente")
         if sentiment == "negative":
@@ -247,8 +257,17 @@ class CommercialAI:
             rationale.append("Sentimiento positivo — buen momento para avanzar")
         if recency >= 80:
             rationale.append("Cliente activo en las últimas 24 h")
-        elif recency <= 25:
-            rationale.append("Sin interacción en más de 30 días — riesgo de fuga")
+        else:
+            days_silent = (
+                _days_since(ctx.customer.last_interaction_at, ctx.now)
+                if ctx.customer else 0
+            )
+            if days_silent >= 5:
+                rationale.append(
+                    f"Cliente sin seguimiento hace {days_silent} días"
+                )
+            elif recency <= 25:
+                rationale.append("Sin interacción en más de 30 días — riesgo de fuga")
         if monetary >= 70:
             rationale.append("Valor del deal alto o cliente con LTV relevante")
         if engagement >= 70:
@@ -257,6 +276,24 @@ class CommercialAI:
             rationale.append("IA Live marcó escalación a humano")
         if ctx.customer and ctx.customer.priority == "hot":
             rationale.append("Lead HOT según CRM")
+
+        # FASE 4 — extra recommendation templates requested by spec.
+        # All signals are computed from data the pipeline already reads.
+        if ctx.orders_count >= 3:
+            rationale.append("Cliente con historial de compras recurrentes")
+        if (
+            monetary >= 70
+            and ctx.orders_count >= 2
+            and recency >= 60
+        ):
+            rationale.append("Posible cliente VIP — asignar ejecutivo dedicado")
+        elif deal.is_vip and ctx.orders_count >= 1:
+            rationale.append("Cliente VIP con compras previas — proteger relación")
+        if (
+            deal.stage == "negotiation"
+            and (ctx.now - deal.stage_entered_at).days > 7
+        ):
+            rationale.append("Lead estancado en negociación — más de 7 días sin avanzar")
 
         breakdown = AIScoreBreakdown(
             total=total,
@@ -351,4 +388,5 @@ __all__ = [
     "_recency_score",
     "_monetary_score",
     "_engagement_score",
+    "_days_since",
 ]
