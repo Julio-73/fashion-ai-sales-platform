@@ -60,3 +60,6 @@ Write-Host "Para detener: Get-Process | Where-Object { \$_.Id -in @($($be.Id), $
 Write-Host "O usa: taskkill /F /PID $($be.Id) & taskkill /F /PID $($fe.Id)" -ForegroundColor Gray
 
 
+
+
+

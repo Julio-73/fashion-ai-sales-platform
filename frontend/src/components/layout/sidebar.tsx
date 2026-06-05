@@ -5,6 +5,7 @@ import {
   Bot,
   Building2,
   ClipboardList,
+  LineChart,
   MessageSquare,
   Package,
   Settings,
@@ -25,6 +26,7 @@ const navGroups = [
   {
     label: S.workspace,
     items: [
+      { label: "Dashboard Ejecutivo", icon: LineChart, href: "/dashboard/executive" },
       { label: S.customers, icon: UsersRound, href: "/dashboard/customers" },
       { label: S.products, icon: Package, href: "/dashboard/products" },
       { label: S.chats, icon: MessageSquare, href: "/dashboard/conversations" },

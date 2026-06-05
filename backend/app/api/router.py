@@ -12,6 +12,7 @@ from app.modules.conversations.router import router as conversations_router
 from app.modules.companies.router import router as companies_router
 from app.modules.crm.router import router as crm_router
 from app.modules.customers.router import router as customers_router
+from app.modules.executive_dashboard.router import router as executive_dashboard_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.orders.router import router as orders_router
 from app.modules.pipeline.router import router as pipeline_router
@@ -26,6 +27,7 @@ api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(companies_router, prefix="/companies", tags=["companies"])
 api_router.include_router(customers_router, prefix="/customers", tags=["customers"])
 api_router.include_router(crm_router, prefix="/crm", tags=["crm"])
+api_router.include_router(executive_dashboard_router, prefix="/executive-dashboard", tags=["executive-dashboard"])
 api_router.include_router(inventory_router, prefix="/inventory", tags=["inventory"])
 api_router.include_router(products_router, prefix="/products", tags=["products"])
 api_router.include_router(orders_router, prefix="/orders", tags=["orders"])
