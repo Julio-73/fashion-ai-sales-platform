@@ -655,4 +655,24 @@ export type Locale = {
       enterprise: string;
     };
   };
+  reporting: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    overview: string;
+    overviewDesc: string;
+    readyIn: string;
+    pdf: string;
+    excel: string;
+    executive: string;
+    executiveDesc: string;
+    pipeline: string;
+    pipelineDesc: string;
+    crm: string;
+    crmDesc: string;
+    sales: string;
+    salesDesc: string;
+    inventory: string;
+    inventoryDesc: string;
+  };
 };

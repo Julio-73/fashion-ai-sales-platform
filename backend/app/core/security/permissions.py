@@ -32,6 +32,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "pipeline:read",
         "pipeline:write",
         "pipeline:metrics",
+        "reports:read",
     },
     "admin": {
         "auth:me",
@@ -57,6 +58,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "pipeline:read",
         "pipeline:write",
         "pipeline:metrics",
+        "reports:read",
     },
     "sales_agent": {
         "auth:me",
@@ -78,6 +80,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "pipeline:read",
         "pipeline:write",
         "pipeline:metrics",
+        "reports:read",
     },
     "analyst": {
         "auth:me",
@@ -90,6 +93,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "whatsapp:read",
         "pipeline:read",
         "pipeline:metrics",
+        "reports:read",
     },
 }
 

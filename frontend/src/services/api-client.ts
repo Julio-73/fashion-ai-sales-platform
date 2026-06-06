@@ -96,3 +96,60 @@ export async function apiDelete(path: string, options: ApiClientOptions = {}): P
 
   await handleResponse<void>(response);
 }
+
+export type ApiDownloadResult = {
+  blob: Blob;
+  filename: string;
+  contentType: string;
+};
+
+function parseFilename(headers: Headers, fallback: string): string {
+  const disposition = headers.get("content-disposition") ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  if (match && match[1]) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+  return fallback;
+}
+
+export async function apiDownload(path: string, options: ApiClientOptions = {}): Promise<ApiDownloadResult> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: "GET",
+    headers: {
+      ...(options.accessToken ? { authorization: `Bearer ${options.accessToken}` } : {})
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    let code = "download_error";
+    let message = `Download failed with status ${response.status}`;
+    try {
+      const body = (await response.json()) as { error?: { code?: string; message?: string } };
+      if (body.error?.code) code = body.error.code;
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      // ignore body parse errors
+    }
+    throw new ApiError(code, message, response.status);
+  }
+
+  const blob = await response.blob();
+  const filename = parseFilename(response.headers, path.replace(/^\//, "").replace(/\//g, "_") || "download.bin");
+  return { blob, filename, contentType: response.headers.get("content-type") ?? "application/octet-stream" };
+}
+
+export function triggerBrowserDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

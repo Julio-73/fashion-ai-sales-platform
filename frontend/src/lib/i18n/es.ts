@@ -686,6 +686,33 @@ const es: Locale = {
       enterprise: "Enterprise",
     },
   },
+  reporting: {
+    eyebrow: "Reportes",
+    title: "Centro de Reportes Ejecutivos",
+    description:
+      "Genera reportes profesionales en PDF y Excel para presentar en reuniones ejecutivas.",
+    overview: "Reportes disponibles",
+    overviewDesc:
+      "Selecciona el reporte que necesitas. Cada reporte se genera en menos de 3 segundos y respeta el aislamiento multi-tenant.",
+    readyIn: "Listo en segundos",
+    pdf: "Exportar PDF",
+    excel: "Exportar Excel",
+    executive: "Reporte Ejecutivo",
+    executiveDesc:
+      "Resumen 360°: ventas, clientes, pipeline, forecast y alertas críticas en un solo documento.",
+    pipeline: "Reporte de Pipeline",
+    pipelineDesc:
+      "Embudo comercial completo, deals por etapa, conversión, valor ganado y valor perdido.",
+    crm: "Reporte de Clientes (CRM)",
+    crmDesc:
+      "Cartera total, segmentación VIP / recurrentes / inactivos, LTV promedio y top clientes.",
+    sales: "Reporte de Ventas",
+    salesDesc:
+      "Tendencia diaria y mensual, ticket promedio, listado de pedidos y top productos.",
+    inventory: "Reporte de Inventario",
+    inventoryDesc:
+      "Stock crítico, valor de inventario, productos más vendidos y detalle por producto.",
+  },
 };
 
 export default es;
