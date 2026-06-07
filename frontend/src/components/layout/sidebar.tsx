@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  AlertTriangle,
   BarChart3,
   Bot,
   Building2,
+  Calendar,
   ClipboardList,
   LineChart,
+  ListChecks,
   MessageSquare,
   Package,
   Settings,
@@ -32,6 +35,9 @@ const navGroups = [
       { label: S.chats, icon: MessageSquare, href: "/dashboard/conversations" },
       { label: "Pedidos", icon: ClipboardList, href: "/dashboard/orders" },
       { label: S.analytics, icon: BarChart3, href: "/dashboard" },
+      { label: "Task Center", icon: ListChecks, href: "/dashboard/tasks" },
+      { label: "Calendario", icon: Calendar, href: "/dashboard/calendar" },
+      { label: "Alertas", icon: AlertTriangle, href: "/dashboard/alerts" },
       { label: S.automations, icon: Workflow, href: "/dashboard/automations" }
     ]
   },

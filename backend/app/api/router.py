@@ -7,6 +7,7 @@ from app.conversations.router import router as conversations_core_router
 from app.modules.admin.router import router as admin_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
+from app.modules.automation.router import router as automation_router
 from app.modules.chats.router import router as chats_router
 from app.modules.conversations.router import router as conversations_router
 from app.modules.companies.router import router as companies_router
@@ -42,3 +43,4 @@ api_router.include_router(sales_router, prefix="/sales", tags=["sales"])
 api_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_router.include_router(ai_live_router, prefix="/ai-live", tags=["ai-live"])
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
+api_router.include_router(automation_router, prefix="/automation", tags=["automation"])

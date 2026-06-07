@@ -31,10 +31,23 @@ def create_app() -> FastAPI:
         from app.modules.inventory.listeners import register_inventory_listener
 
         register_inventory_listener()
-        yield
-        from app.modules.inventory.listeners import unregister_inventory_listener
+        # Start the automation engine scheduler (additive).
+        from app.modules.automation.scheduler import start_scheduler
 
-        unregister_inventory_listener()
+        scheduler_handle = start_scheduler()
+        try:
+            yield
+        finally:
+            if scheduler_handle is not None:
+                _task, stop_event = scheduler_handle
+                stop_event.set()
+                try:
+                    await _task
+                except Exception:  # pragma: no cover - shutdown
+                    logger.exception("automation scheduler shutdown error")
+            from app.modules.inventory.listeners import unregister_inventory_listener
+
+            unregister_inventory_listener()
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
