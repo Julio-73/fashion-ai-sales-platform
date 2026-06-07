@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, TrendingUp, Users } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusPill } from "@/components/ui/status-pill";
 import { usePipelineStore } from "@/store/pipeline-store";
+import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/modules/crm/utils/format";
 import type {
   PipelineItem,
   PipelineStageInfo
@@ -21,26 +26,6 @@ type Props = {
   onDragOverColumn: (stageKey: string) => void;
   onDropOnColumn: (stageKey: string) => void;
   dragOverStage: string | null;
-};
-
-const STAGE_BG: Record<string, string> = {
-  new_lead: "bg-slate-50",
-  contacted: "bg-sky-50",
-  qualified: "bg-cyan-50",
-  proposal: "bg-violet-50",
-  negotiation: "bg-amber-50",
-  won: "bg-emerald-50",
-  lost: "bg-rose-50"
-};
-
-const STAGE_BORDER: Record<string, string> = {
-  new_lead: "border-slate-300",
-  contacted: "border-sky-300",
-  qualified: "border-cyan-300",
-  proposal: "border-violet-300",
-  negotiation: "border-amber-300",
-  won: "border-emerald-300",
-  lost: "border-rose-300"
 };
 
 export function KanbanColumn({
@@ -63,7 +48,11 @@ export function KanbanColumn({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const valueCount = deals.length;
-  const totalValue = deals.reduce((s, d) => s + Number(d.estimated_value || 0), 0);
+  const totalValue = deals.reduce(
+    (s, d) => s + Number(d.estimated_value || 0),
+    0
+  );
+  const avgValue = valueCount > 0 ? totalValue / valueCount : 0;
   const isOver = dragOverStage === stage.key;
   const isValidDrop =
     draggingDeal !== null &&
@@ -108,56 +97,77 @@ export function KanbanColumn({
         e.preventDefault();
         onDropOnColumn(stage.key);
       }}
-      className={`flex h-full w-72 flex-shrink-0 flex-col rounded-xl border-2 transition ${
-        STAGE_BG[stage.key] ?? "bg-slate-50"
-      } ${
-        isOver
-          ? `${STAGE_BORDER[stage.key] ?? "border-slate-300"} border-dashed`
-          : "border-transparent"
-      } ${isValidDrop ? "ring-2 ring-indigo-300" : ""}`}
+      className={cn(
+        "flex h-full w-72 shrink-0 flex-col rounded-2xl border bg-card/60 backdrop-blur-sm transition-all",
+        isOver &&
+          "border-primary border-dashed bg-primary-50 shadow-md ring-2 ring-primary-100",
+        !isOver &&
+          isValidDrop &&
+          "ring-2 ring-primary-200 shadow-sm",
+        !isOver && !isValidDrop && "shadow-xs"
+      )}
     >
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <span
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ backgroundColor: stage.color }}
-          />
-          <h3 className="text-sm font-semibold text-slate-700">{stage.label}</h3>
-          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-            {valueCount}
-          </span>
+      <div className="rounded-t-2xl border-b border-border/60 bg-gradient-to-b from-card to-muted/40 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-card"
+              style={{ backgroundColor: stage.color }}
+              aria-hidden="true"
+            />
+            <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
+              {stage.label}
+            </h3>
+            <StatusPill tone="neutral" size="sm">
+              {valueCount}
+            </StatusPill>
+          </div>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-primary-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Nuevo deal"
+            type="button"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded p-1 text-slate-400 hover:bg-white hover:text-indigo-600"
-          aria-label="Nuevo deal"
-          type="button"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-slate-500">
-        {totalValue.toLocaleString("es-ES", {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 0
-        })}
+        <div className="mt-1.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="inline-flex items-center gap-0.5">
+            <TrendingUp className="h-3 w-3" aria-hidden="true" />
+            {totalValue.toLocaleString("es-ES", {
+              style: "currency",
+              currency: "USD",
+              maximumFractionDigits: 0
+            })}
+          </span>
+          {valueCount > 0 ? (
+            <span className="inline-flex items-center gap-0.5">
+              <Users className="h-3 w-3" aria-hidden="true" />
+              {avgValue.toLocaleString("es-ES", {
+                style: "currency",
+                currency: "USD",
+                maximumFractionDigits: 0
+              })}{" "}
+              prom.
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {showForm ? (
         <form
           onSubmit={handleCreate}
-          className="mx-3 mb-2 rounded-lg border border-slate-200 bg-white p-2"
+          className="mx-3 mt-2 rounded-lg border border-border bg-card p-2 shadow-xs"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Nuevo deal
             </span>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded p-0.5 text-slate-400 hover:text-slate-600"
+              className="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Cerrar formulario"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -166,7 +176,7 @@ export function KanbanColumn({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Ej: pedido de pantalón negro"
-            className="mt-1.5 w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <div className="mt-1.5 flex gap-1.5">
             <input
@@ -174,12 +184,12 @@ export function KanbanColumn({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Valor"
-              className="w-1/2 rounded border border-slate-200 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+              className="w-1/2 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <select
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
-              className="w-1/2 rounded border border-slate-200 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+              className="w-1/2 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="manual">Manual</option>
               <option value="whatsapp">WhatsApp</option>
@@ -190,27 +200,37 @@ export function KanbanColumn({
             </select>
           </div>
           {localError ? (
-            <div className="mt-1 text-[10px] text-rose-600">{localError}</div>
+            <div className="mt-1 text-[10px] font-medium text-destructive">
+              {localError}
+            </div>
           ) : null}
-          <button
+          <Button
             type="submit"
+            variant="gradient"
+            size="sm"
             disabled={busy}
-            className="mt-2 w-full rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="mt-2 w-full"
           >
-            {busy ? "Creando…" : "Crear"}
-          </button>
+            {busy ? "Creando…" : "Crear deal"}
+          </Button>
         </form>
       ) : null}
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+      <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
         {isLoading ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/60 p-3 text-center text-xs text-slate-400">
-            Cargando…
-          </div>
+          <>
+            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+          </>
         ) : null}
         {!isLoading && deals.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/60 p-3 text-center text-xs text-slate-400">
-            Suelta un deal aquí
+          <div
+            className={cn(
+              "rounded-xl border-2 border-dashed border-border bg-muted/30 p-4 text-center text-xs text-muted-foreground transition",
+              isOver && "border-primary bg-primary-50/40 text-primary"
+            )}
+          >
+            {isOver ? "Suelta aquí" : "Suelta un deal aquí"}
           </div>
         ) : null}
         {deals.map((d) => (
@@ -223,6 +243,12 @@ export function KanbanColumn({
           />
         ))}
       </div>
+
+      {valueCount > 0 ? (
+        <div className="border-t border-border/60 bg-muted/30 px-3 py-1.5 text-[10px] text-muted-foreground">
+          {stage.is_terminal ? "Etapa terminal" : `Prob. base ${stage.default_probability}%`}
+        </div>
+      ) : null}
     </div>
   );
 }

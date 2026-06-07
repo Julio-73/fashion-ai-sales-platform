@@ -5,7 +5,7 @@ import { CalendarDays, Loader2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { DashboardContent } from "@/components/layout/dashboard-content";
-import { DashboardHeader } from "@/components/layout/dashboard-header";
+import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuthStore } from "@/store/auth-store";
@@ -84,10 +84,15 @@ export default function CalendarPage() {
   return (
     <AppShell>
       <DashboardContent>
-        <DashboardHeader
+        <PageHeader
           eyebrow="Automatización"
           title="Calendario comercial"
           description="Seguimientos, llamadas, reuniones, cierres proyectados y vencimientos."
+          breadcrumbs={[
+            { label: "Workspace", href: "/dashboard" },
+            { label: "Automatización" },
+            { label: "Calendario" }
+          ]}
         />
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">

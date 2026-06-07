@@ -137,6 +137,9 @@ describe("SalesTrendChart — summary arithmetic", () => {
 
   it("renders a skeleton when isLoading=true", () => {
     const { container } = render(<SalesTrendChart data={[]} isLoading={true} />);
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    const skeletons = container.querySelectorAll(
+      '.skeleton-shimmer, .animate-pulse, [role="status"]'
+    );
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 });

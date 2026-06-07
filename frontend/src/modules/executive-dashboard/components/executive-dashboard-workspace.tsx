@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertCircle, RefreshCcw } from "lucide-react";
+import { AlertCircle, Clock, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatDelta } from "@/components/ui/stat";
 import { ApiError } from "@/services/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import type { ExecutiveDashboardResponse } from "@/types/executive-dashboard";
@@ -20,7 +21,8 @@ import { TopCustomersTable } from "./top-customers-table";
 import { TopProducts } from "./top-products";
 
 export function ExecutiveDashboardWorkspace() {
-  const { accessToken, refreshToken, user, refreshSession, logout } = useAuthStore();
+  const { accessToken, refreshToken, user, refreshSession, logout } =
+    useAuthStore();
   const [data, setData] = useState<ExecutiveDashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,9 @@ export function ExecutiveDashboardWorkspace() {
           }
           return;
         }
-        setError("No se pudo cargar el dashboard ejecutivo. Verifica el backend y tu sesión.");
+        setError(
+          "No se pudo cargar el dashboard ejecutivo. Verifica el backend y tu sesión."
+        );
       } finally {
         if (activeRef.current) setIsLoading(false);
       }
@@ -76,16 +80,20 @@ export function ExecutiveDashboardWorkspace() {
 
   if (error && !data) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-700">
+      <Card variant="elevated">
+        <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive-50 text-destructive ring-1 ring-destructive-100">
             <AlertCircle className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">No se pudo cargar el dashboard</p>
-            <p className="mt-1 max-w-md text-xs text-muted-foreground">{error}</p>
+            <p className="text-sm font-semibold text-foreground">
+              No se pudo cargar el dashboard
+            </p>
+            <p className="mt-1 max-w-md text-xs text-muted-foreground">
+              {error}
+            </p>
           </div>
-          <Button type="button" variant="default" size="sm" onClick={() => load()}>
+          <Button type="button" variant="default" onClick={() => load()}>
             <RefreshCcw className="h-3.5 w-3.5" />
             Reintentar
           </Button>
@@ -99,7 +107,10 @@ export function ExecutiveDashboardWorkspace() {
       <KpiStrip kpis={data?.kpis ?? null} isLoading={isLoading} />
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <SalesTrendChart data={data?.sales_trend.daily ?? []} isLoading={isLoading} />
+        <SalesTrendChart
+          data={data?.sales_trend.daily ?? []}
+          isLoading={isLoading}
+        />
         <SalesForecast forecast={data?.forecast ?? null} isLoading={isLoading} />
       </div>
 
@@ -110,16 +121,31 @@ export function ExecutiveDashboardWorkspace() {
 
       <PipelineFunnel pipeline={data?.pipeline ?? null} isLoading={isLoading} />
 
-      <TopCustomersTable customers={data?.top_customers ?? []} isLoading={isLoading} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        <TopCustomersTable
+          customers={data?.top_customers ?? []}
+          isLoading={isLoading}
+        />
+        <ExecutiveAlerts
+          alerts={data?.alerts ?? null}
+          isLoading={isLoading}
+        />
+      </div>
 
       <TopProducts data={data?.top_products ?? null} isLoading={isLoading} />
 
-      <ExecutiveAlerts alerts={data?.alerts ?? null} isLoading={isLoading} />
-
       {data ? (
-        <p className="text-right text-[10px] text-muted-foreground">
-          Actualizado {new Date(data.generated_at).toLocaleString("es-PE")} · calculado en {data.metadata.computed_in_ms} ms.
-        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] text-muted-foreground">
+          <StatDelta
+            value={`${data.metadata.computed_in_ms}ms`}
+            direction="flat"
+            size="sm"
+          />
+          <Clock className="h-3 w-3" />
+          <span>
+            Actualizado {new Date(data.generated_at).toLocaleString("es-PE")}
+          </span>
+        </div>
       ) : null}
     </div>
   );

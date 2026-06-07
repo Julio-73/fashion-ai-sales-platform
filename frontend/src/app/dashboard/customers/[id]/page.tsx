@@ -12,7 +12,6 @@ import {
   TrendingUp,
   UserRound
 } from "lucide-react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { t } from "@/lib/i18n";
@@ -20,9 +19,12 @@ import { ApiError } from "@/services/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
+import { StatusPill } from "@/components/ui/status-pill";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PageHeader } from "@/components/layout/page-header";
 import { DashboardContent } from "@/components/layout/dashboard-content";
-import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { DashboardSection } from "@/components/layout/dashboard-section";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,12 +34,22 @@ import {
   getCustomerOrders
 } from "@/modules/crm/services/crm-api";
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/modules/crm/utils/format";
+import { cn } from "@/lib/utils";
 import type {
   Customer360Summary,
   CustomerOrderHistoryItem
 } from "@/types/crm";
 
 const P = t.crm.detail;
+
+const ORDER_STATUS_TONE: Record<string, "destructive" | "success" | "info" | "warning" | "primary" | "neutral"> = {
+  cancelled: "destructive",
+  delivered: "success",
+  confirmed: "info",
+  preparing: "warning",
+  shipped: "primary",
+  pending: "neutral"
+};
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: P.orders.cancelled,
@@ -46,15 +58,6 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   preparing: P.orders.preparing,
   shipped: P.orders.shipped,
   pending: P.orders.pending
-};
-
-const ORDER_STATUS_TONE: Record<string, string> = {
-  cancelled: "bg-rose-50 text-rose-700 ring-rose-200",
-  delivered: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  confirmed: "bg-blue-50 text-blue-700 ring-blue-200",
-  preparing: "bg-amber-50 text-amber-700 ring-amber-200",
-  shipped: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  pending: "bg-slate-100 text-slate-700 ring-slate-200"
 };
 
 export default function CustomerDetailPage() {
@@ -138,42 +141,44 @@ export default function CustomerDetailPage() {
   return (
     <AppShell>
       <DashboardContent>
-        <div className="mb-4 flex items-center gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/dashboard/customers")}
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            {P.back}
-          </Button>
-        </div>
-        <DashboardHeader
+        <PageHeader
           eyebrow={t.crm.page.eyebrow}
-          title={
-            summary?.full_name ?? (isLoading ? "Cargando cliente..." : "Cliente")
-          }
+          title={summary?.full_name ?? (isLoading ? "Cargando cliente..." : "Cliente")}
           description={
             summary
-              ? `${summary.email ?? summary.phone ?? summary.instagram_username ?? ""}`
+              ? `${summary.email ?? summary.phone ?? summary.instagram_username ?? t.crm.workspace.fallbackNotSet}`
               : "Perfil 360 del cliente"
+          }
+          breadcrumbs={[
+            { label: "CRM", href: "/dashboard/customers" },
+            { label: summary?.full_name ?? "Cliente" }
+          ]}
+          actions={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/dashboard/customers")}
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              {P.back}
+            </Button>
           }
         />
 
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-lg border bg-card p-5 shadow-sm">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="mt-5 h-8 w-32" />
-              </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="h-32 w-full rounded-xl"
+              />
             ))}
           </div>
         ) : null}
 
         {error ? (
-          <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="rounded-lg border border-destructive-200 bg-destructive-50 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
@@ -192,67 +197,138 @@ export default function CustomerDetailPage() {
 
         {!isLoading && !notFound && summary ? (
           <div className="grid gap-6">
+            <Card variant="elevated" className="overflow-hidden">
+              <div className="relative bg-gradient-to-r from-primary-50 via-purple-50/40 to-cyan-50/40 px-6 py-5">
+                <div className="flex flex-wrap items-center gap-4">
+                  <Avatar
+                    name={summary.full_name}
+                    size="xl"
+                    className="ring-4 ring-card"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-xl font-semibold tracking-tight text-foreground">
+                      {summary.full_name}
+                    </h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      {summary.email ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                          {summary.email}
+                        </span>
+                      ) : null}
+                      {summary.phone ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+                          {summary.phone}
+                        </span>
+                      ) : null}
+                      {summary.whatsapp ? (
+                        <span className="inline-flex items-center gap-1 text-success">
+                          <MessageCircle
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                          {summary.whatsapp}
+                        </span>
+                      ) : null}
+                      {summary.instagram_username ? (
+                        <span className="inline-flex items-center gap-1 text-pink-600">
+                          <Instagram
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                          {summary.instagram_username}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <StatusPill
+                    tone={
+                      summary.metrics.status === "vip"
+                        ? "warning"
+                        : summary.metrics.status === "inactivo"
+                          ? "destructive"
+                          : "success"
+                    }
+                    size="md"
+                  >
+                    {summary.metrics.status.toUpperCase()}
+                  </StatusPill>
+                </div>
+              </div>
+            </Card>
+
             <DashboardSection title={P.summary.title}>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="grid gap-4 md:grid-cols-2">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>{P.summary.contact}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <ContactRow
-                      icon={Mail}
-                      label="Email"
-                      value={summary.email}
-                    />
-                    <ContactRow
-                      icon={Phone}
-                      label="Teléfono"
-                      value={summary.phone}
-                    />
-                    <ContactRow
-                      icon={MessageCircle}
-                      label="WhatsApp"
-                      value={summary.whatsapp}
-                    />
-                    <ContactRow
-                      icon={Instagram}
-                      label="Instagram"
-                      value={summary.instagram_username}
-                    />
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold tracking-tight text-foreground">
+                      {P.summary.contact}
+                    </h3>
+                    <div className="mt-3 grid gap-2">
+                      <ContactRow
+                        icon={Mail}
+                        label="Email"
+                        value={summary.email}
+                      />
+                      <ContactRow
+                        icon={Phone}
+                        label="Teléfono"
+                        value={summary.phone}
+                      />
+                      <ContactRow
+                        icon={MessageCircle}
+                        label="WhatsApp"
+                        value={summary.whatsapp}
+                        accent="success"
+                      />
+                      <ContactRow
+                        icon={Instagram}
+                        label="Instagram"
+                        value={summary.instagram_username}
+                        accent="primary"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Perfil</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        {P.summary.leadStatus}
-                      </span>
-                      <span className="font-medium capitalize">
-                        {summary.lead_status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        {P.summary.source}
-                      </span>
-                      <span className="font-medium">
-                        {summary.source ?? P.summary.noSource}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        {P.summary.registeredAt}
-                      </span>
-                      <span className="font-medium">
-                        {formatDate(summary.created_at)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Estado 360</span>
-                      <CustomerLifecycleBadge status={summary.metrics.status} />
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold tracking-tight text-foreground">
+                      Perfil
+                    </h3>
+                    <div className="mt-3 grid gap-2 text-sm">
+                      <InfoRow
+                        label={P.summary.leadStatus}
+                        value={
+                          <span className="font-medium capitalize">
+                            {summary.lead_status}
+                          </span>
+                        }
+                      />
+                      <InfoRow
+                        label={P.summary.source}
+                        value={
+                          <span className="font-medium">
+                            {summary.source ?? P.summary.noSource}
+                          </span>
+                        }
+                      />
+                      <InfoRow
+                        label={P.summary.registeredAt}
+                        value={
+                          <span className="font-medium">
+                            {formatDate(summary.created_at)}
+                          </span>
+                        }
+                      />
+                      <InfoRow
+                        label="Estado 360"
+                        value={
+                          <CustomerLifecycleBadge
+                            status={summary.metrics.status}
+                          />
+                        }
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -260,53 +336,56 @@ export default function CustomerDetailPage() {
             </DashboardSection>
 
             <DashboardSection title={P.metrics.title}>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricTile
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <MetricCard
                   icon={ClipboardList}
-                  label={P.metrics.orderCount}
+                  title={P.metrics.orderCount}
                   value={formatNumber(summary.metrics.order_count)}
+                  iconTone="info"
                 />
-                <MetricTile
+                <MetricCard
                   icon={TrendingUp}
-                  label={P.metrics.lifetimeValue}
+                  title={P.metrics.lifetimeValue}
                   value={formatCurrency(summary.metrics.lifetime_value)}
+                  iconTone="success"
                 />
-                <MetricTile
+                <MetricCard
                   icon={TrendingUp}
-                  label={P.metrics.averageTicket}
+                  title={P.metrics.averageTicket}
                   value={formatCurrency(summary.metrics.average_ticket)}
+                  iconTone="primary"
                 />
-                <MetricTile
+                <MetricCard
                   icon={Calendar}
-                  label={P.metrics.lastPurchase}
+                  title={P.metrics.lastPurchase}
                   value={
                     summary.metrics.last_purchase_at
                       ? formatDate(summary.metrics.last_purchase_at)
                       : P.metrics.notAvailable
                   }
-                  footer={
+                  iconTone="purple"
+                  description={
                     summary.metrics.days_since_last_purchase !== null ? (
-                      <span className="text-xs text-muted-foreground">
+                      <span>
                         {P.metrics.daysSinceLastPurchase}:{" "}
                         <strong className="text-foreground">
                           {summary.metrics.days_since_last_purchase}
                         </strong>
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {P.metrics.daysSinceNever}
-                      </span>
+                      <span>{P.metrics.daysSinceNever}</span>
                     )
                   }
                 />
-                <MetricTile
+                <MetricCard
                   icon={Calendar}
-                  label={P.metrics.firstPurchase}
+                  title={P.metrics.firstPurchase}
                   value={
                     summary.metrics.first_purchase_at
                       ? formatDate(summary.metrics.first_purchase_at)
                       : P.metrics.notAvailable
                   }
+                  iconTone="warning"
                 />
               </div>
             </DashboardSection>
@@ -329,27 +408,27 @@ export default function CustomerDetailPage() {
                   description={P.orders.emptyDesc}
                 />
               ) : (
-                <>
-                  <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                <Card>
+                  <div className="overflow-hidden rounded-lg">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <tr>
-                          <th className="px-4 py-3">
+                          <th className="px-4 py-3 font-medium">
                             {P.orders.tableHeaderOrder}
                           </th>
-                          <th className="px-4 py-3">
+                          <th className="px-4 py-3 font-medium">
                             {P.orders.tableHeaderDate}
                           </th>
-                          <th className="px-4 py-3">
+                          <th className="px-4 py-3 font-medium">
                             {P.orders.tableHeaderProduct}
                           </th>
-                          <th className="px-4 py-3 text-right">
+                          <th className="px-4 py-3 text-right font-medium">
                             {P.orders.tableHeaderItems}
                           </th>
-                          <th className="px-4 py-3">
+                          <th className="px-4 py-3 font-medium">
                             {P.orders.tableHeaderStatus}
                           </th>
-                          <th className="px-4 py-3 text-right">
+                          <th className="px-4 py-3 text-right font-medium">
                             {P.orders.tableHeaderTotal}
                           </th>
                         </tr>
@@ -358,32 +437,32 @@ export default function CustomerDetailPage() {
                         {orders.map((order) => (
                           <tr
                             key={order.order_id}
-                            className="border-t hover:bg-muted/30"
+                            className="border-t border-border transition hover:bg-muted/30"
                           >
-                            <td className="px-4 py-3 font-medium">
+                            <td className="px-4 py-3 font-medium text-foreground">
                               {order.order_number}
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {formatDateTime(order.created_at)}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 text-foreground">
                               {order.primary_product_name || "—"}
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-right font-medium text-foreground">
                               {formatNumber(order.items_count)}
                             </td>
                             <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ring-1 ${
-                                  ORDER_STATUS_TONE[order.status] ??
-                                  "bg-slate-100 text-slate-700 ring-slate-200"
-                                }`}
+                              <StatusPill
+                                tone={
+                                  ORDER_STATUS_TONE[order.status] ?? "neutral"
+                                }
+                                size="sm"
                               >
                                 {ORDER_STATUS_LABELS[order.status] ??
                                   order.status}
-                              </span>
+                              </StatusPill>
                             </td>
-                            <td className="px-4 py-3 text-right font-medium">
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">
                               {formatCurrency(order.total)}
                             </td>
                           </tr>
@@ -391,8 +470,8 @@ export default function CustomerDetailPage() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
-                    <span>
+                  <div className="flex items-center justify-between border-t border-border px-2 py-2 text-sm text-muted-foreground">
+                    <span className="px-2">
                       {P.orders.paginationShowing
                         .replace("{start}", String(ordersOffset + 1))
                         .replace("{end}", String(ordersOffset + orders.length))
@@ -423,7 +502,7 @@ export default function CustomerDetailPage() {
                       </Button>
                     </div>
                   </div>
-                </>
+                </Card>
               )}
             </DashboardSection>
           </div>
@@ -436,46 +515,53 @@ export default function CustomerDetailPage() {
 function ContactRow({
   icon: Icon,
   label,
-  value
+  value,
+  accent
 }: {
   icon: typeof Mail;
   label: string;
   value: string | null | undefined;
+  accent?: "success" | "primary";
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
-      <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-7 w-7 items-center justify-center rounded-md",
+          accent === "success" && "bg-success-50 text-success",
+          accent === "primary" && "bg-primary-50 text-primary",
+          !accent && "bg-muted text-muted-foreground"
+        )}
+      >
+        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="truncate text-sm font-medium">{value || "—"}</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <p className="truncate text-sm font-medium text-foreground">
+          {value || "—"}
+        </p>
       </div>
     </div>
   );
 }
 
-function MetricTile({
-  icon: Icon,
+function InfoRow({
   label,
-  value,
-  footer
+  value
 }: {
-  icon: typeof Calendar;
   label: string;
-  value: string;
-  footer?: React.ReactNode;
+  value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg border bg-secondary text-primary">
-          <Icon className="h-4 w-4" aria-hidden="true" />
-        </div>
-      </div>
-      <p className="mt-4 text-xl font-semibold tracking-tight">{value}</p>
-      {footer ? <div className="mt-3">{footer}</div> : null}
+    <div className="flex items-center justify-between gap-2 border-b border-dashed border-border/60 py-1.5 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground">{value}</span>
     </div>
   );
 }

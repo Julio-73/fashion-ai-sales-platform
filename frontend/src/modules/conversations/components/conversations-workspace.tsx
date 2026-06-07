@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { DashboardSection } from "@/components/layout/dashboard-section";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusPill } from "@/components/ui/status-pill";
+import { Card, CardContent } from "@/components/ui/card";
 import { ApiError } from "@/services/api-client";
 import {
   getConversationDetail,
@@ -304,17 +306,19 @@ export function ConversationsWorkspace() {
       </button>
     ),
     status: (
-      <span
-        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+      <StatusPill
+        tone={
           conv.estado === "open"
-            ? "bg-green-100 text-green-800"
+            ? "success"
             : conv.estado === "pending"
-              ? "bg-amber-100 text-amber-800"
-              : "bg-slate-100 text-slate-600"
-        }`}
+              ? "warning"
+              : "neutral"
+        }
+        size="sm"
+        dot
       >
         {statusLabel[conv.estado] ?? conv.estado}
-      </span>
+      </StatusPill>
     ),
     updated: (
       <span className="text-sm text-muted-foreground">
@@ -335,40 +339,42 @@ export function ConversationsWorkspace() {
     <>
       <div className={`grid gap-6 ${gridCols}`}>
         <div className="grid gap-5">
-          <div className="rounded-lg border bg-card p-4 shadow-sm">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_auto]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={W.searchPlaceholder}
-                  value={search}
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_auto]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder={W.searchPlaceholder}
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setOffset(0);
+                    }}
+                  />
+                </div>
+                <select
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={estado}
                   onChange={(event) => {
-                    setSearch(event.target.value);
+                    setEstado(event.target.value as ConversationStatus | "all");
                     setOffset(0);
                   }}
-                />
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s === "all" ? W.allStatuses : statusLabel[s]}
+                    </option>
+                  ))}
+                </select>
+                <Button type="button" variant="outline">
+                  <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                  {W.filters}
+                </Button>
               </div>
-              <select
-                className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={estado}
-                onChange={(event) => {
-                  setEstado(event.target.value as ConversationStatus | "all");
-                  setOffset(0);
-                }}
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s === "all" ? W.allStatuses : statusLabel[s]}
-                  </option>
-                ))}
-              </select>
-              <Button type="button" variant="outline">
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                {W.filters}
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {error ? (
             <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -416,16 +422,20 @@ export function ConversationsWorkspace() {
                             {canalIcon[conv.canal] ?? canalIcon.manual} {conv.canal}
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            conv.estado === "open"
-                              ? "bg-green-100 text-green-800"
-                              : conv.estado === "pending"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {statusLabel[conv.estado] ?? conv.estado}
+                        <span>
+                          <StatusPill
+                            tone={
+                              conv.estado === "open"
+                                ? "success"
+                                : conv.estado === "pending"
+                                  ? "warning"
+                                  : "neutral"
+                            }
+                            size="sm"
+                            dot
+                          >
+                            {statusLabel[conv.estado] ?? conv.estado}
+                          </StatusPill>
                         </span>
                       </div>
                     </motion.button>
@@ -475,26 +485,29 @@ export function ConversationsWorkspace() {
 
         {/* Conversation Detail Panel */}
         {selected ? (
-          <div className="flex flex-col rounded-lg border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b px-4 py-3">
+          <Card className="flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h3 className="text-sm font-semibold">
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">
                   {selected.asunto ?? W.noSubject}
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  {canalIcon[selected.canal] ?? canalIcon.manual} {selected.canal}
-                  {" — "}
-                  <span
-                    className={`font-medium ${
+                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{canalIcon[selected.canal] ?? canalIcon.manual}</span>
+                  <span>{selected.canal}</span>
+                  <span>—</span>
+                  <StatusPill
+                    tone={
                       selected.estado === "open"
-                        ? "text-green-600"
+                        ? "success"
                         : selected.estado === "pending"
-                          ? "text-amber-600"
-                          : "text-slate-500"
-                    }`}
+                          ? "warning"
+                          : "neutral"
+                    }
+                    size="sm"
+                    dot
                   >
                     {statusLabel[selected.estado] ?? selected.estado}
-                  </span>
+                  </StatusPill>
                 </p>
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={closeDetail}>
@@ -527,10 +540,10 @@ export function ConversationsWorkspace() {
             </div>
 
             {selected.estado !== "closed" ? (
-              <div className="border-t p-3">
+              <div className="border-t border-border p-3">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder={W.messagePlaceholder}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
@@ -552,13 +565,13 @@ export function ConversationsWorkspace() {
                 </div>
               </div>
             ) : (
-              <div className="border-t p-3 text-center text-sm text-muted-foreground">
+              <div className="border-t border-border p-3 text-center text-sm text-muted-foreground">
                 {W.closedChat}
               </div>
             )}
-          </div>
+          </Card>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border bg-card p-12 shadow-sm">
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-card p-12">
             <EmptyState
               icon={MessageSquare}
               title={W.selectChat}

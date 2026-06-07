@@ -15,16 +15,22 @@ import {
   RefreshCw,
   Search,
   Sparkles,
-  X
+  X,
+  type LucideIcon
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusPill } from "@/components/ui/status-pill";
+import { EmptyState } from "@/components/feedback/empty-state";
+import { Kbd } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import * as automationService from "@/services/automation.service";
 import type {
+  AutomationCalendarEntry,
   AutomationMetrics,
   AutomationTask,
   AutomationTaskBoard
@@ -32,18 +38,18 @@ import type {
 
 type View = "board" | "list" | "calendar" | "alerts";
 
-const PRIORITY_TONE: Record<string, "success" | "warning" | "neutral"> = {
-  critical: "warning",
+const PRIORITY_TONE: Record<string, "destructive" | "warning" | "primary" | "info" | "neutral"> = {
+  critical: "destructive",
   high: "warning",
-  medium: "neutral",
+  medium: "primary",
   low: "neutral"
 };
 
-const STATUS_TONE: Record<string, "success" | "warning" | "neutral"> = {
+const STATUS_TONE: Record<string, "success" | "warning" | "primary" | "info" | "destructive" | "neutral"> = {
   completed: "success",
-  pending: "neutral",
-  in_progress: "neutral",
-  overdue: "warning",
+  pending: "info",
+  in_progress: "primary",
+  overdue: "destructive",
   cancelled: "neutral"
 };
 
@@ -88,6 +94,13 @@ function formatDate(value: string | null): string {
   });
 }
 
+function isOverdue(task: AutomationTask): boolean {
+  if (task.status === "completed" || task.status === "cancelled") return false;
+  if (task.status === "overdue") return true;
+  if (!task.due_date) return false;
+  return new Date(task.due_date).getTime() < Date.now();
+}
+
 function TaskCard({
   task,
   onComplete,
@@ -97,60 +110,68 @@ function TaskCard({
   onComplete: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  const overdue = isOverdue(task);
   return (
-    <Card className="border-slate-200">
-      <CardContent className="space-y-2 p-4">
+    <Card
+      className={cn(
+        "group transition-all hover:-translate-y-px hover:shadow-md",
+        overdue && "ring-1 ring-destructive/30"
+      )}
+    >
+      <CardContent className="space-y-2.5 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900">
+            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
               {task.title}
             </p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {TYPE_LABEL[task.task_type] || task.task_type} · Vence{" "}
-              {formatDate(task.due_date)}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {TYPE_LABEL[task.task_type] || task.task_type}
+              {task.due_date ? ` · Vence ${formatDate(task.due_date)}` : ""}
             </p>
           </div>
-          <StatusBadge tone={PRIORITY_TONE[task.priority] || "neutral"}>
+          <StatusPill tone={PRIORITY_TONE[task.priority] || "neutral"} size="sm">
             {PRIORITY_LABEL[task.priority] || task.priority}
-          </StatusBadge>
+          </StatusPill>
         </div>
         {task.description ? (
-          <p className="line-clamp-2 text-xs text-slate-600">
+          <p className="line-clamp-2 text-xs text-muted-foreground">
             {task.description}
           </p>
         ) : null}
         {task.ai_next_action ? (
-          <div className="flex items-center gap-1.5 rounded-md bg-indigo-50 px-2 py-1.5 text-xs text-indigo-700">
-            <Sparkles className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 rounded-md border border-primary-100 bg-primary-50/60 px-2 py-1.5 text-xs text-primary-700 dark:bg-primary-50/20 dark:border-primary-200/30 dark:text-primary-200">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="line-clamp-1">{task.ai_next_action}</span>
             {typeof task.ai_score === "number" ? (
-              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">
+              <span className="ml-auto rounded bg-card px-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
                 Score {task.ai_score}
               </span>
             ) : null}
           </div>
         ) : null}
         <div className="flex items-center gap-2 pt-1">
-          <StatusBadge tone={STATUS_TONE[task.status] || "neutral"}>
+          <StatusPill tone={STATUS_TONE[task.status] || "neutral"} size="sm">
             {STATUS_LABEL[task.status] || task.status}
-          </StatusBadge>
+          </StatusPill>
           {task.status !== "completed" && task.status !== "cancelled" ? (
             <>
               <Button
                 size="sm"
-                variant="outline"
-                className="h-7 text-xs"
+                variant="success"
                 onClick={() => onComplete(task.id)}
+                className="ml-auto h-7 text-xs"
               >
-                <CheckCircle2 className="mr-1 h-3 w-3" /> Completar
+                <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
+                Completar
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 text-xs text-slate-500"
                 onClick={() => onCancel(task.id)}
+                className="h-7 text-xs"
+                aria-label="Cancelar tarea"
               >
-                <X className="mr-1 h-3 w-3" /> Cancelar
+                <X className="h-3 w-3" aria-hidden="true" />
               </Button>
             </>
           ) : null}
@@ -173,19 +194,19 @@ function BoardView({
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
       {board.columns.map((col) => (
         <div key={col.key} className="flex flex-col gap-2">
-          <div className="flex items-center justify-between rounded-md bg-slate-100 px-3 py-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
               {col.label}
             </h3>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200">
+            <StatusPill tone="neutral" size="sm">
               {col.count}
-            </span>
+            </StatusPill>
           </div>
           <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pr-1">
             {col.tasks.length === 0 ? (
-              <p className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
+              <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
                 Sin tareas
-              </p>
+              </div>
             ) : (
               col.tasks.map((t) => (
                 <TaskCard
@@ -212,89 +233,86 @@ function ListView({
   onComplete: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  if (tasks.length === 0) {
+    return (
+      <EmptyState
+        icon={Inbox}
+        title="No hay tareas"
+        description="Ajusta los filtros o ejecuta el motor de automatización para generar nuevas tareas."
+      />
+    );
+  }
   return (
     <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Tarea</th>
-                <th className="px-3 py-2 text-left">Tipo</th>
-                <th className="px-3 py-2 text-left">Prioridad</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-                <th className="px-3 py-2 text-left">Vence</th>
-                <th className="px-3 py-2 text-left">IA</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Tarea</th>
+              <th className="px-3 py-2 font-medium">Tipo</th>
+              <th className="px-3 py-2 font-medium">Prioridad</th>
+              <th className="px-3 py-2 font-medium">Estado</th>
+              <th className="px-3 py-2 font-medium">Vence</th>
+              <th className="px-3 py-2 font-medium">IA</th>
+              <th className="px-3 py-2 text-right font-medium">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((t) => (
+              <tr
+                key={t.id}
+                className="border-b border-border/60 transition hover:bg-muted/30"
+              >
+                <td className="max-w-[260px] truncate px-3 py-2 font-medium text-foreground">
+                  {t.title}
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">
+                  {TYPE_LABEL[t.task_type] || t.task_type}
+                </td>
+                <td className="px-3 py-2">
+                  <StatusPill tone={PRIORITY_TONE[t.priority] || "neutral"} size="sm">
+                    {PRIORITY_LABEL[t.priority] || t.priority}
+                  </StatusPill>
+                </td>
+                <td className="px-3 py-2">
+                  <StatusPill tone={STATUS_TONE[t.status] || "neutral"} size="sm">
+                    {STATUS_LABEL[t.status] || t.status}
+                  </StatusPill>
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">
+                  {formatDate(t.due_date)}
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">
+                  {t.ai_next_action
+                    ? `${t.ai_next_action}${t.ai_score ? ` · ${t.ai_score}` : ""}`
+                    : "—"}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {t.status !== "completed" && t.status !== "cancelled" ? (
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onComplete(t.id)}
+                      >
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Hecho
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onCancel(t.id)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : null}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {tasks.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-3 py-6 text-center text-xs text-slate-400"
-                  >
-                    No hay tareas
-                  </td>
-                </tr>
-              ) : (
-                tasks.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50">
-                    <td className="max-w-[260px] truncate px-3 py-2 font-medium text-slate-800">
-                      {t.title}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
-                      {TYPE_LABEL[t.task_type] || t.task_type}
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge tone={PRIORITY_TONE[t.priority] || "neutral"}>
-                        {PRIORITY_LABEL[t.priority] || t.priority}
-                      </StatusBadge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge tone={STATUS_TONE[t.status] || "neutral"}>
-                        {STATUS_LABEL[t.status] || t.status}
-                      </StatusBadge>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
-                      {formatDate(t.due_date)}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
-                      {t.ai_next_action
-                        ? `${t.ai_next_action}${t.ai_score ? ` · ${t.ai_score}` : ""}`
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {t.status !== "completed" && t.status !== "cancelled" ? (
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            onClick={() => onComplete(t.id)}
-                          >
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Hecho
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs"
-                            onClick={() => onCancel(t.id)}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
@@ -304,57 +322,58 @@ function CalendarView({
   view,
   onChangeView
 }: {
-  entries: import("@/types/automation").AutomationCalendarEntry[];
+  entries: AutomationCalendarEntry[];
   view: "day" | "week" | "month";
   onChangeView: (v: "day" | "week" | "month") => void;
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="inline-flex items-center gap-1 rounded-lg border border-input bg-card p-0.5">
         {(["day", "week", "month"] as const).map((v) => (
           <button
             type="button"
             key={v}
             onClick={() => onChangeView(v)}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition",
               v === view
-                ? "bg-indigo-600 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
           >
             {v === "day" ? "Día" : v === "week" ? "Semana" : "Mes"}
           </button>
         ))}
       </div>
       <Card>
-        <CardContent className="p-0">
-          <div className="divide-y divide-slate-100">
-            {entries.length === 0 ? (
-              <p className="px-4 py-8 text-center text-xs text-slate-400">
-                Sin seguimientos programados
-              </p>
-            ) : (
-              entries.map((e) => (
-                <div
-                  key={e.task_id}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
-                >
-                  <Calendar className="h-4 w-4 text-indigo-500" />
-                  <span className="font-medium text-slate-800">{e.title}</span>
-                  <span className="text-xs text-slate-500">
-                    {formatDate(e.due_date)}
-                  </span>
-                  <StatusBadge tone={PRIORITY_TONE[e.priority] || "neutral"}>
-                    {PRIORITY_LABEL[e.priority] || e.priority}
-                  </StatusBadge>
-                  <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-500">
-                    {TYPE_LABEL[e.task_type] || e.task_type}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
+        <div className="divide-y divide-border">
+          {entries.length === 0 ? (
+            <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+              Sin seguimientos programados
+            </div>
+          ) : (
+            entries.map((e) => (
+              <div
+                key={e.task_id}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-muted/30"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-50 text-primary">
+                  <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+                <span className="font-medium text-foreground">{e.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(e.due_date)}
+                </span>
+                <StatusPill tone={PRIORITY_TONE[e.priority] || "neutral"} size="sm">
+                  {PRIORITY_LABEL[e.priority] || e.priority}
+                </StatusPill>
+                <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {TYPE_LABEL[e.task_type] || e.task_type}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
       </Card>
     </div>
   );
@@ -367,41 +386,52 @@ function AlertsView({
   metrics: AutomationMetrics | null;
   onRun: () => void;
 }) {
-  const cards = metrics
+  const cards: Array<{
+    label: string;
+    value: number;
+    icon: LucideIcon;
+    tone: "destructive" | "warning" | "info" | "primary" | "purple" | "success";
+  }> = metrics
     ? [
-        { label: "Leads calientes", value: metrics.tasks_pending, icon: Sparkles, tone: "indigo" },
-        { label: "Leads fríos", value: metrics.tasks_overdue, icon: Clock, tone: "amber" },
-        { label: "Negociaciones detenidas", value: metrics.tasks_total - metrics.tasks_completed, icon: CircleDashed, tone: "slate" },
-        { label: "Clientes VIP inactivos", value: metrics.alerts_critical, icon: AlertTriangle, tone: "rose" },
-        { label: "Pedidos en riesgo", value: metrics.by_task_type?.order_risk || 0, icon: ListChecks, tone: "slate" },
-        { label: "Inventario crítico", value: metrics.by_task_type?.inventory_check || 0, icon: Inbox, tone: "slate" }
+        { label: "Leads calientes", value: metrics.tasks_pending, icon: Sparkles, tone: "primary" },
+        { label: "Leads fríos", value: metrics.tasks_overdue, icon: Clock, tone: "warning" },
+        { label: "Negociaciones detenidas", value: metrics.tasks_total - metrics.tasks_completed, icon: CircleDashed, tone: "info" },
+        { label: "Clientes VIP inactivos", value: metrics.alerts_critical, icon: AlertTriangle, tone: "destructive" },
+        { label: "Pedidos en riesgo", value: metrics.by_task_type?.order_risk || 0, icon: ListChecks, tone: "warning" },
+        { label: "Inventario crítico", value: metrics.by_task_type?.inventory_check || 0, icon: Inbox, tone: "purple" }
       ]
     : [];
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">
-          Centro de alertas
-        </h3>
-        <Button size="sm" variant="outline" onClick={onRun}>
-          <RefreshCw className="mr-1 h-3 w-3" /> Ejecutar motor
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Centro de alertas
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Métricas en tiempo real del motor de automatización
+          </p>
+        </div>
+        <Button variant="outline" onClick={onRun}>
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          Ejecutar motor
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => (
-          <Card key={c.label} className="border-slate-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs uppercase tracking-wide text-slate-500">
-                {c.label}
-              </CardTitle>
-              <c.icon className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold text-slate-900">{c.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {cards.length === 0 ? (
+        <Skeleton className="h-40 w-full rounded-xl" />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((c) => (
+            <MetricCard
+              key={c.label}
+              title={c.label}
+              value={String(c.value)}
+              icon={c.icon}
+              iconTone={c.tone}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -535,66 +565,68 @@ export function AutomationWorkspace() {
           title="Tareas abiertas"
           value={String(metrics?.tasks_pending ?? 0)}
           icon={ListChecks}
+          iconTone="primary"
           trend={metrics ? `${metrics.tasks_today} hoy` : "—"}
         />
         <MetricCard
           title="Vencidas"
           value={String(metrics?.tasks_overdue ?? 0)}
           icon={AlertTriangle}
+          iconTone="destructive"
           trend={metrics ? `${metrics.tasks_this_week} esta semana` : "—"}
         />
         <MetricCard
           title="Tasa de cierre"
           value={`${metrics?.tasks_completion_rate_pct ?? 0}%`}
           icon={CheckCircle2}
+          iconTone="success"
           trend={metrics ? `${metrics.tasks_completed} hechas` : "—"}
         />
         <MetricCard
           title="Reglas activas"
           value={`${metrics?.rules_enabled ?? 0}/${metrics?.rules_total ?? 0}`}
           icon={Play}
-          trend={
-            metrics
-              ? `${metrics.automation_executions} ejecuciones`
-              : "—"
-          }
+          iconTone="purple"
+          trend={metrics ? `${metrics.automation_executions} ejecuciones` : "—"}
         />
       </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3">
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5">
+      <Card variant="elevated">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-input bg-card p-0.5">
             {tabs.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setView(t.key as View)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition",
                   view === t.key
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
               >
-                <t.icon className="h-3.5 w-3.5" /> {t.label}
+                <t.icon className="h-3.5 w-3.5" />
+                {t.label}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar tarea"
-                className="h-8 rounded-md border border-slate-200 bg-white pl-7 pr-2 text-xs"
+                className="h-8 w-44 rounded-md border border-input bg-background pl-7 pr-2 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
-            <div className="flex items-center gap-1">
-              <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <div className="inline-flex items-center gap-1">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs"
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Estado</option>
                 <option value="pending">Pendiente</option>
@@ -605,7 +637,7 @@ export function AutomationWorkspace() {
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs"
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Prioridad</option>
                 <option value="critical">Crítica</option>
@@ -616,16 +648,17 @@ export function AutomationWorkspace() {
             </div>
             <Button size="sm" onClick={handleRun} disabled={running}>
               {running ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
-                <RefreshCw className="mr-1 h-3 w-3" />
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
               )}
               Ejecutar motor
             </Button>
             {lastRun ? (
-              <span className="text-[10px] text-slate-500">
-                Última: {lastRun}
-              </span>
+              <Kbd>
+                <Clock className="mr-1 inline h-3 w-3" aria-hidden="true" />
+                {lastRun}
+              </Kbd>
             ) : null}
           </div>
         </CardContent>
@@ -633,15 +666,19 @@ export function AutomationWorkspace() {
 
       <div>
         {view === "board" ? (
-          board ? (
+          loading && !board ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-40 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : board ? (
             <BoardView
               board={board}
               onComplete={handleComplete}
               onCancel={handleCancel}
             />
-          ) : (
-            <p className="text-xs text-slate-500">Cargando…</p>
-          )
+          ) : null
         ) : null}
         {view === "list" ? (
           <ListView
