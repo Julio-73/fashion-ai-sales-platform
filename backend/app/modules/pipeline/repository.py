@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.pipeline.models import (

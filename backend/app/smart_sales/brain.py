@@ -32,7 +32,6 @@ from app.modules.orders.repository import OrderRepository
 from app.modules.orders.schemas import OrderCreateRequest, OrderItemCreateRequest
 from app.modules.orders.service import OrderService
 from app.smart_sales.contextual_commitment import (
-    CommitmentStage,
     CommitmentStateMachine,
     ContextLockEngine,
     EliteProductConfirmation,

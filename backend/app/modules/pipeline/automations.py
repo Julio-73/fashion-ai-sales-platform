@@ -16,9 +16,9 @@ Rules implemented:
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Iterable
+from typing import Iterable
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func, select
@@ -27,7 +27,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.customers.models import Cliente
 from app.modules.pipeline.ai import CommercialAI
 from app.modules.pipeline.models import (
-    CLOSED_STAGES,
     LOST_STAGE,
     OPEN_STAGES,
     WON_STAGE,

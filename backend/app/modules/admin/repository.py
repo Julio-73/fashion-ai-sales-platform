@@ -10,8 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import (
     ADMIN_AUDIT_ACTIONS,
-    DEFAULT_EMPRESA_PLAN,
-    DEFAULT_EMPRESA_STATUS,
     AdminAuditLog,
     AdminRefreshToken,
     AdminUser,

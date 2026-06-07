@@ -26,7 +26,6 @@ from app.modules.pipeline.schemas import (
     PipelineItemResponse,
     PipelineItemUpdate,
     PipelineMetricsResponse,
-    PipelineRecommendation,
     PipelineRecommendationsResponse,
     PipelineStageInfo,
 )

@@ -65,7 +65,7 @@ const navGroups: NavGroup[] = [
     label: S.platform,
     items: [
       { label: S.aiSales, icon: Bot, href: "/dashboard/ai-sales" },
-      { label: S.settings, icon: Settings, href: "/dashboard" }
+
     ]
   }
 ];

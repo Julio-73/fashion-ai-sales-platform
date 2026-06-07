@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column

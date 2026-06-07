@@ -10,11 +10,9 @@ Output: a 0–100 score plus a textual recommendation.
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, func, select
@@ -25,7 +23,6 @@ from app.modules.customers.models import Cliente
 from app.modules.orders.models import Order
 from app.modules.pipeline.models import (
     CLOSED_STAGES,
-    OPEN_STAGES,
     SalesPipelineItem,
     WON_STAGE,
     LOST_STAGE,

@@ -13,8 +13,7 @@ implementation stays consistent.
 """
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -1033,7 +1032,7 @@ class ExecutiveDashboardRepository:
                     "priority": "medium",
                     "category": "producto_top",
                     "cta_label": "Ver producto",
-                    "cta_href": f"/dashboard/products",
+                    "cta_href": "/dashboard/products",
                 }
             )
 

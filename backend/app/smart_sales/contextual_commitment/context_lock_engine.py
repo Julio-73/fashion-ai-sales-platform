@@ -2,7 +2,6 @@ import logging
 from dataclasses import dataclass, field
 
 from app.smart_sales.contextual_commitment.selected_product_tracker import (
-    CommitmentData,
     SelectedProductTracker,
 )
 from app.smart_sales.contextual_commitment.commitment_state_machine import (

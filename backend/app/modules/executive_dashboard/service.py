@@ -8,7 +8,6 @@ No write paths — read-only and idempotent.
 from __future__ import annotations
 
 import time
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession

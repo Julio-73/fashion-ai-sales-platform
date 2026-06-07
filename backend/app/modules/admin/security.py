@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.errors import AppError

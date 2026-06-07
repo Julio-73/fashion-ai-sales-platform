@@ -1,7 +1,6 @@
 """Service layer — business orchestration."""
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -28,7 +27,6 @@ from app.modules.pipeline.schemas import (
     AIScoreBreakdown,
     CustomerSummary,
     PipelineAIScoreResponse,
-    PipelineAlert,
     PipelineAlertsResponse,
     PipelineBoardResponse,
     PipelineDashboardResponse,

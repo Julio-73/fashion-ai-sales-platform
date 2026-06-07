@@ -55,16 +55,6 @@ class EliteProductConfirmation:
         if not product:
             return None
 
-        color_phrase = ""
-        if commitment.selected_color:
-            color_line = choice(COLOR_CONFIRMATION).format(color=commitment.selected_color)
-            color_phrase = f"en {commitment.selected_color} — {color_line}\n"
-
-        size_phrase = ""
-        if commitment.selected_size:
-            size_line = choice(SIZE_CONFIRMATION).format(size=commitment.selected_size)
-            size_phrase = f"{size_line}\n"
-
         template = choice(CONFIRMATION_TEMPLATES)
         text = template.format(
             product=product,

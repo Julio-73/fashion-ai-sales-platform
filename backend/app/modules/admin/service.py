@@ -8,21 +8,19 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security.password import hash_password, verify_password
+from app.core.security.password import verify_password
 from app.modules.admin.models import (
     DEFAULT_EMPRESA_PLAN,
     DEFAULT_EMPRESA_STATUS,
     EMPRESA_PLANS,
     EMPRESA_STATUS,
     SUPER_ADMIN_ROLE,
-    AdminUser,
 )
 from app.modules.admin.repository import (
     AdminAuditRepository,

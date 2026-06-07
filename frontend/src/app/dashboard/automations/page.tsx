@@ -18,7 +18,7 @@ export default function AutomationsPage() {
             { label: "Automatización" },
             { label: "Automatizaciones" }
           ]}
-          status={{ label: "12 reglas activas", tone: "success" }}
+          status={{ label: "En vivo", tone: "success" }}
         />
         <AutomationsWorkspace />
       </DashboardContent>
