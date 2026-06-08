@@ -13,7 +13,10 @@ export default function AutoLoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "demo@fashionsales.ai", password: "Demo@2024!" }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Login failed");
+        return r.json();
+      })
       .then((data) => {
         localStorage.setItem(
           "ai-sales-agent-auth",

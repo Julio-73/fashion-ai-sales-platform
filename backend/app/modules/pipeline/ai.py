@@ -11,7 +11,7 @@ Output: a 0–100 score plus a textual recommendation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -209,7 +209,7 @@ class CommercialAI:
             ai_state=ai_state,
             orders_count=orders_count,
             lifetime_value=ltv,
-            now=datetime.now(timezone.utc),
+            now=datetime.utcnow(),
         )
 
     # ------------------------------------------------------------------

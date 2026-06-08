@@ -498,9 +498,6 @@ class PipelineService:
         return PipelineAIScoreResponse(deal_id=deal.id, score=total, breakdown=breakdown)
 
     async def dashboard(self, empresa_id: UUID) -> PipelineDashboardResponse:
-        metrics_task = asyncio.create_task(self.metrics(empresa_id))
-        funnel_task = asyncio.create_task(self.funnel(empresa_id))
-        alerts_task = asyncio.create_task(self.alerts(empresa_id))
         deals = await self.repo.list_items(
             empresa_id=empresa_id, is_open=True, limit=50
         )
@@ -519,9 +516,9 @@ class PipelineService:
         top_deals_resp = await self._enrich(top_deals, include_ai=True)
         score_map = {d.id: s for s, d in scored}
         top_deals_resp.sort(key=lambda r: -score_map.get(r.id, 0))
-        metrics = await metrics_task
-        funnel = await funnel_task
-        alerts = await alerts_task
+        metrics = await self.metrics(empresa_id)
+        funnel = await self.funnel(empresa_id)
+        alerts = await self.alerts(empresa_id)
         return PipelineDashboardResponse(
             metrics=metrics,
             funnel=funnel,
