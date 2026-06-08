@@ -1,4 +1,5 @@
 import logging
+import time
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -25,12 +26,43 @@ from app.modules.auth.schemas import (
 
 logger = logging.getLogger("ai_sales_agent.auth")
 
+ACCOUNT_LOCKOUT_MAX_ATTEMPTS = 5
+ACCOUNT_LOCKOUT_WINDOW = 300
+
+_login_failures: dict[str, list[float]] = {}
+
+
+def _check_account_locked(email: str) -> None:
+    now = time.time()
+    if email in _login_failures:
+        _login_failures[email] = [t for t in _login_failures[email] if now - t < ACCOUNT_LOCKOUT_WINDOW]
+        if len(_login_failures[email]) >= ACCOUNT_LOCKOUT_MAX_ATTEMPTS:
+            remaining = int(ACCOUNT_LOCKOUT_WINDOW - (now - _login_failures[email][0]))
+            raise AppError(
+                code="account_locked",
+                message=f"Account temporarily locked due to too many failed attempts. Try again in {remaining} seconds.",
+                status_code=429,
+            )
+
+
+def _record_login_failure(email: str) -> None:
+    now = time.time()
+    if email not in _login_failures:
+        _login_failures[email] = []
+    _login_failures[email].append(now)
+
+
+def _clear_login_failures(email: str) -> None:
+    _login_failures.pop(email, None)
+
 
 class AuthService:
     def __init__(self, repository: AuthRepository) -> None:
         self._repository = repository
 
-    async def register(self, payload: RegisterRequest) -> AuthSessionResponse:
+    async def register(
+        self, payload: RegisterRequest, *, ip_address: str | None = None
+    ) -> AuthSessionResponse:
         password_hash = hash_password(payload.password)
         try:
             _, user, membership = await self._repository.create_company_with_owner(
@@ -41,7 +73,10 @@ class AuthService:
             )
             response = await self._create_session_response(user=user, membership=membership)
             await self._repository.commit()
-            logger.info("Registered user=%s company=%s", user.id, membership.empresa_id)
+            logger.info(
+                "Registered user=%s company=%s ip=%s",
+                user.id, membership.empresa_id, ip_address or "unknown",
+            )
             return response
         except IntegrityError as exc:
             await self._repository.rollback()
@@ -52,20 +87,29 @@ class AuthService:
                 status_code=409,
             ) from exc
 
-    async def login(self, payload: LoginRequest) -> AuthSessionResponse:
+    async def login(
+        self, payload: LoginRequest, *, ip_address: str | None = None
+    ) -> AuthSessionResponse:
+        _check_account_locked(payload.email.lower())
         user = await self._repository.get_user_by_email(email=payload.email.lower())
         if user is None or not verify_password(payload.password, user.password_hash):
+            _record_login_failure(payload.email.lower())
             logger.warning("Failed login attempt for email=%s", payload.email)
             raise AppError(code="invalid_credentials", message="Invalid email or password", status_code=401)
 
         if user.estado != "active":
+            _record_login_failure(payload.email.lower())
             logger.warning("Disabled account login attempt user=%s", user.id)
             raise AppError(code="account_disabled", message="Account is not active", status_code=403)
 
+        _clear_login_failures(payload.email.lower())
         membership = await self._resolve_membership(user_id=user.id, empresa_id=payload.empresa_id)
         response = await self._create_session_response(user=user, membership=membership)
         await self._repository.commit()
-        logger.info("Login success user=%s empresa=%s", user.id, membership.empresa_id)
+        logger.info(
+            "Login success user=%s empresa=%s ip=%s",
+            user.id, membership.empresa_id, ip_address or "unknown",
+        )
         return response
 
     async def refresh(self, payload: RefreshTokenRequest) -> TokenResponse:
