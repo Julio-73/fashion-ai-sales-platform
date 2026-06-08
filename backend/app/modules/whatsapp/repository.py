@@ -14,6 +14,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.encryption import decrypt, encrypt
 from app.modules.whatsapp.models import WhatsappAccount, WhatsappMessage, WhatsappWebhook
 
 
@@ -22,6 +23,8 @@ class WhatsappAccountRepository:
         self._session = session
 
     async def create(self, *, empresa_id: UUID, **fields: Any) -> WhatsappAccount:
+        if "access_token" in fields and fields["access_token"]:
+            fields["access_token"] = encrypt(fields["access_token"])
         account = WhatsappAccount(empresa_id=empresa_id, **fields)
         self._session.add(account)
         await self._session.flush()
@@ -36,7 +39,10 @@ class WhatsappAccountRepository:
                 WhatsappAccount.id == account_id,
             )
         )
-        return result.scalar_one_or_none()
+        account = result.scalar_one_or_none()
+        if account is not None:
+            account.access_token = decrypt(account.access_token)
+        return account
 
     async def get_by_phone_number_id(
         self, *, phone_number_id: str
@@ -51,7 +57,10 @@ class WhatsappAccountRepository:
                 WhatsappAccount.phone_number_id == phone_number_id
             )
         )
-        return result.scalar_one_or_none()
+        account = result.scalar_one_or_none()
+        if account is not None:
+            account.access_token = decrypt(account.access_token)
+        return account
 
     async def list_active(
         self, *, empresa_id: UUID
@@ -64,7 +73,10 @@ class WhatsappAccountRepository:
             )
             .order_by(WhatsappAccount.created_at.asc())
         )
-        return result.scalars().all()
+        accounts = result.scalars().all()
+        for a in accounts:
+            a.access_token = decrypt(a.access_token)
+        return accounts
 
     async def list_all(self, *, empresa_id: UUID) -> Sequence[WhatsappAccount]:
         result = await self._session.execute(
@@ -72,7 +84,10 @@ class WhatsappAccountRepository:
             .where(WhatsappAccount.empresa_id == empresa_id)
             .order_by(WhatsappAccount.created_at.asc())
         )
-        return result.scalars().all()
+        accounts = result.scalars().all()
+        for a in accounts:
+            a.access_token = decrypt(a.access_token)
+        return accounts
 
     async def update(
         self,
@@ -83,6 +98,8 @@ class WhatsappAccountRepository:
         for key, value in payload.items():
             if value is None:
                 continue
+            if key == "access_token":
+                value = encrypt(value)
             setattr(account, key, value)
         account.updated_at = datetime.now(UTC)
         await self._session.flush()

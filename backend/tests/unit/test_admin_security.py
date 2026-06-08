@@ -95,7 +95,8 @@ def test_admin_token_rejects_other_typ() -> None:
         "iat": now,
         "exp": now + 60,
     }
-    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    admin_key = settings.admin_jwt_secret_key or settings.jwt_secret_key
+    token = jwt.encode(payload, admin_key, algorithm=settings.jwt_algorithm)
     with pytest.raises(AppError) as exc:
         verify_admin_access_token(token)
     assert exc.value.status_code == 401

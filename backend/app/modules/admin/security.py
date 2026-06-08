@@ -98,6 +98,11 @@ def _permissions_for_roles(roles: list[str]) -> set[str]:
     return perms
 
 
+def _admin_jwt_secret() -> str:
+    settings = get_settings()
+    return settings.admin_jwt_secret_key or settings.jwt_secret_key
+
+
 def create_admin_access_token(*, user_id: UUID, email: str, roles: list[str]) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
@@ -115,7 +120,7 @@ def create_admin_access_token(*, user_id: UUID, email: str, roles: list[str]) ->
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, _admin_jwt_secret(), algorithm=settings.jwt_algorithm)
 
 
 def verify_admin_access_token(token: str) -> AdminTokenPayload:
@@ -123,7 +128,7 @@ def verify_admin_access_token(token: str) -> AdminTokenPayload:
     try:
         payload = jwt.decode(
             token,
-            settings.jwt_secret_key,
+            _admin_jwt_secret(),
             algorithms=[settings.jwt_algorithm],
             issuer=ADMIN_TOKEN_ISSUER,
             audience=ADMIN_TOKEN_AUDIENCE,

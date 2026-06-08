@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.redis import get_redis
 from app.core.security.password import hash_password, verify_password
 from app.core.security.permissions import permissions_for_roles
 from app.core.security.tokens import (
@@ -32,8 +33,32 @@ ACCOUNT_LOCKOUT_WINDOW = 300
 _login_failures: dict[str, list[float]] = {}
 
 
-def _check_account_locked(email: str) -> None:
+async def _redis_lockout_key(email: str) -> str:
+    return f"lockout:{email.lower()}"
+
+
+async def _check_account_locked(email: str) -> None:
     now = time.time()
+    r = await get_redis()
+    if r is not None:
+        try:
+            key = await _redis_lockout_key(email)
+            count = await r.llen(key)
+            if count >= ACCOUNT_LOCKOUT_MAX_ATTEMPTS:
+                oldest = await r.lindex(key, 0)
+                if oldest:
+                    remaining = int(ACCOUNT_LOCKOUT_WINDOW - (now - float(oldest)))
+                    if remaining > 0:
+                        raise AppError(
+                            code="account_locked",
+                            message=f"Account temporarily locked due to too many failed attempts. Try again in {remaining} seconds.",
+                            status_code=429,
+                        )
+                    await r.delete(key)
+        except AppError:
+            raise
+        except Exception:
+            pass
     if email in _login_failures:
         _login_failures[email] = [t for t in _login_failures[email] if now - t < ACCOUNT_LOCKOUT_WINDOW]
         if len(_login_failures[email]) >= ACCOUNT_LOCKOUT_MAX_ATTEMPTS:
@@ -45,14 +70,34 @@ def _check_account_locked(email: str) -> None:
             )
 
 
-def _record_login_failure(email: str) -> None:
+async def _record_login_failure(email: str) -> None:
     now = time.time()
+    r = await get_redis()
+    if r is not None:
+        try:
+            key = await _redis_lockout_key(email)
+            pipe = r.pipeline()
+            pipe.rpush(key, now)
+            pipe.ltrim(key, -ACCOUNT_LOCKOUT_MAX_ATTEMPTS, -1)
+            pipe.expire(key, ACCOUNT_LOCKOUT_WINDOW)
+            await pipe.execute()
+            return
+        except Exception:
+            pass
     if email not in _login_failures:
         _login_failures[email] = []
     _login_failures[email].append(now)
 
 
-def _clear_login_failures(email: str) -> None:
+async def _clear_login_failures(email: str) -> None:
+    r = await get_redis()
+    if r is not None:
+        try:
+            key = await _redis_lockout_key(email)
+            await r.delete(key)
+            return
+        except Exception:
+            pass
     _login_failures.pop(email, None)
 
 
@@ -90,19 +135,19 @@ class AuthService:
     async def login(
         self, payload: LoginRequest, *, ip_address: str | None = None
     ) -> AuthSessionResponse:
-        _check_account_locked(payload.email.lower())
+        await _check_account_locked(payload.email.lower())
         user = await self._repository.get_user_by_email(email=payload.email.lower())
         if user is None or not verify_password(payload.password, user.password_hash):
-            _record_login_failure(payload.email.lower())
+            await _record_login_failure(payload.email.lower())
             logger.warning("Failed login attempt for email=%s", payload.email)
             raise AppError(code="invalid_credentials", message="Invalid email or password", status_code=401)
 
         if user.estado != "active":
-            _record_login_failure(payload.email.lower())
+            await _record_login_failure(payload.email.lower())
             logger.warning("Disabled account login attempt user=%s", user.id)
             raise AppError(code="account_disabled", message="Account is not active", status_code=403)
 
-        _clear_login_failures(payload.email.lower())
+        await _clear_login_failures(payload.email.lower())
         membership = await self._resolve_membership(user_id=user.id, empresa_id=payload.empresa_id)
         response = await self._create_session_response(user=user, membership=membership)
         await self._repository.commit()

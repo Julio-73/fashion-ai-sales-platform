@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     jwt_audience: str
     jwt_algorithm: str = "HS256"
     jwt_secret_key: str
+    admin_jwt_secret_key: str = ""
+    whatsapp_encryption_key: str = ""
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
@@ -49,6 +51,10 @@ class Settings(BaseSettings):
         warnings: list[str] = []
         if self.jwt_secret_key and "change-before-production" in self.jwt_secret_key:
             warnings.append("JWT_SECRET_KEY still has the default development value. Generate a new random key for production.")
+        if not self.admin_jwt_secret_key:
+            warnings.append("ADMIN_JWT_SECRET_KEY is not configured. Admin JWT shares the same secret as user JWT — set a separate key for production.")
+        if not self.whatsapp_encryption_key:
+            warnings.append("WHATSAPP_ENCRYPTION_KEY is not configured. WhatsApp access tokens will be stored in plaintext.")
         if not self.redis_url:
             warnings.append("REDIS_URL is not configured. Rate limiting and caching will use in-memory storage (not suitable for multi-instance production).")
         if self.app_env == "production" and self.backend_cors_origins == "http://localhost:3000":

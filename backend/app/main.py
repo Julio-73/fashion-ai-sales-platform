@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.log_config import configure_logging
 from app.core.middleware import register_middleware
+from app.core.redis import close_redis, get_redis
 from app.database.session import check_database_connection
 
 configure_logging()
@@ -40,9 +41,11 @@ def create_app() -> FastAPI:
         from app.modules.automation.scheduler import start_scheduler
 
         scheduler_handle = start_scheduler()
+        await get_redis()
         try:
             yield
         finally:
+            await close_redis()
             if scheduler_handle is not None:
                 _task, stop_event = scheduler_handle
                 stop_event.set()

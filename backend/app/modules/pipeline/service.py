@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+import logging
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+import asyncio
 
 from app.core.errors import AppError
 from app.modules.customers.models import Cliente
@@ -23,6 +26,7 @@ from app.modules.pipeline.models import (
     is_valid_stage,
 )
 from app.modules.pipeline.repository import PipelineRepository
+
 from app.modules.pipeline.schemas import (
     AIScoreBreakdown,
     CustomerSummary,
@@ -41,6 +45,7 @@ from app.modules.pipeline.schemas import (
     PipelineStageInfo,
 )
 
+logger = logging.getLogger("ai_sales_agent.pipeline")
 
 STAGE_CATALOG: list[PipelineStageInfo] = [
     PipelineStageInfo(
@@ -474,9 +479,14 @@ class PipelineService:
         deals = await self.repo.list_items(
             empresa_id=empresa_id, is_open=True, limit=500
         )
+        tasks = [self.ai.recommend(d) for d in deals]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         recs: list[PipelineRecommendation] = []
-        for d in deals:
-            recs.append(await self.ai.recommend(d))
+        for d, r in zip(deals, results):
+            if isinstance(r, Exception):
+                logger.warning("AI recommend failed for deal %s: %s", d.id, r)
+                continue
+            recs.append(r)
         recs.sort(key=lambda r: -r.score)
         return PipelineRecommendationsResponse(recommendations=recs, total=len(recs))
 
@@ -488,24 +498,30 @@ class PipelineService:
         return PipelineAIScoreResponse(deal_id=deal.id, score=total, breakdown=breakdown)
 
     async def dashboard(self, empresa_id: UUID) -> PipelineDashboardResponse:
-        metrics = await self.metrics(empresa_id)
-        funnel = await self.funnel(empresa_id)
-        alerts = await self.alerts(empresa_id)
-        # Top deals by AI score, limit 5
+        metrics_task = asyncio.create_task(self.metrics(empresa_id))
+        funnel_task = asyncio.create_task(self.funnel(empresa_id))
+        alerts_task = asyncio.create_task(self.alerts(empresa_id))
         deals = await self.repo.list_items(
             empresa_id=empresa_id, is_open=True, limit=50
         )
+        score_tasks = [self.ai.score_deal(d) for d in deals]
+        score_results = await asyncio.gather(*score_tasks, return_exceptions=True)
         scored = []
-        for d in deals:
-            total, _, _ = await self.ai.score_deal(d)
+        for d, r in zip(deals, score_results):
+            if isinstance(r, Exception):
+                logger.warning("AI score_deal failed for deal %s: %s", d.id, r)
+                continue
+            total, _, _ = r
             scored.append((total, d))
         scored.sort(key=lambda t: -t[0])
         top_ids = {d.id for _, d in scored[:5]}
         top_deals = [d for d in deals if d.id in top_ids]
         top_deals_resp = await self._enrich(top_deals, include_ai=True)
-        # Sort response by score desc
         score_map = {d.id: s for s, d in scored}
         top_deals_resp.sort(key=lambda r: -score_map.get(r.id, 0))
+        metrics = await metrics_task
+        funnel = await funnel_task
+        alerts = await alerts_task
         return PipelineDashboardResponse(
             metrics=metrics,
             funnel=funnel,

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.redis import get_redis
 
 
 RATE_LIMIT_WINDOW = 60
@@ -30,6 +31,24 @@ def _is_rate_limited(
     else:
         store[ip] = [now]
     return False
+
+
+async def _redis_check_rate_limit(key: str, max_requests: int, window: int) -> bool:
+    r = await get_redis()
+    if r is None:
+        return False
+    try:
+        pipe = r.pipeline()
+        now = time.time()
+        window_start = now - window
+        pipe.zremrangebyscore(key, 0, window_start)
+        pipe.zcard(key)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, window)
+        _, count, _, _ = await pipe.execute()
+        return int(count) >= max_requests
+    except Exception:
+        return False
 
 
 def register_middleware(app: FastAPI) -> None:
@@ -82,23 +101,24 @@ def register_middleware(app: FastAPI) -> None:
         client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
         path = request.url.path
 
+        limited = False
         if path.endswith("/auth/login") or path.endswith("/auth/register"):
-            if _is_rate_limited(client_ip, _login_attempts, max_requests=10, window=60):
-                return JSONResponse(
-                    status_code=429,
-                    content={"error": {"code": "rate_limit_exceeded", "message": "Too many requests. Try again later."}},
-                )
+            limited = await _redis_check_rate_limit(f"rl:{client_ip}:auth", 10, 60)
+            if not limited:
+                limited = _is_rate_limited(client_ip, _login_attempts, max_requests=10, window=60)
         elif path.endswith("/admin/auth/login"):
-            if _is_rate_limited(client_ip, _admin_login_attempts, max_requests=5, window=60):
-                return JSONResponse(
-                    status_code=429,
-                    content={"error": {"code": "rate_limit_exceeded", "message": "Too many requests. Try again later."}},
-                )
+            limited = await _redis_check_rate_limit(f"rl:{client_ip}:admin", 5, 60)
+            if not limited:
+                limited = _is_rate_limited(client_ip, _admin_login_attempts, max_requests=5, window=60)
         else:
-            if _is_rate_limited(client_ip, _login_attempts, max_requests=RATE_LIMIT_MAX_REQUESTS, window=RATE_LIMIT_WINDOW):
-                return JSONResponse(
-                    status_code=429,
-                    content={"error": {"code": "rate_limit_exceeded", "message": "Too many requests. Try again later."}},
-                )
+            limited = await _redis_check_rate_limit(f"rl:{client_ip}:global", RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW)
+            if not limited:
+                limited = _is_rate_limited(client_ip, _login_attempts, max_requests=RATE_LIMIT_MAX_REQUESTS, window=RATE_LIMIT_WINDOW)
+
+        if limited:
+            return JSONResponse(
+                status_code=429,
+                content={"error": {"code": "rate_limit_exceeded", "message": "Too many requests. Try again later."}},
+            )
 
         return await call_next(request)

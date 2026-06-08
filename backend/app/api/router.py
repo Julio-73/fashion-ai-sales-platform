@@ -21,6 +21,7 @@ from app.modules.products.router import router as products_router
 from app.modules.reporting.router import router as reporting_router
 from app.modules.whatsapp.router import router as whatsapp_router
 from app.sales.api.router import router as sales_router
+from app.smart_sales.router import router as smart_sales_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -44,3 +45,4 @@ api_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_router.include_router(ai_live_router, prefix="/ai-live", tags=["ai-live"])
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
 api_router.include_router(automation_router, prefix="/automation", tags=["automation"])
+api_router.include_router(smart_sales_router, prefix="/smart-sales", tags=["smart-sales"])
