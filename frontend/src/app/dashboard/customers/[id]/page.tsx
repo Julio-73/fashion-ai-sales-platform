@@ -409,7 +409,7 @@ export default function CustomerDetailPage() {
                 />
               ) : (
                 <Card>
-                  <div className="overflow-hidden rounded-lg">
+                  <div className="overflow-x-auto rounded-lg">
                     <table className="w-full text-sm">
                       <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <tr>

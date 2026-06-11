@@ -8,10 +8,10 @@ import {
   Package,
   Plus,
   Sparkles,
-  TrendingUp,
   UsersRound,
   Workflow
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { t } from "@/lib/i18n";
@@ -123,6 +123,7 @@ const moduleRows: Array<Record<string, ReactNode>> = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   return (
     <AppShell>
       <DashboardContent>
@@ -134,11 +135,11 @@ export default function DashboardPage() {
           status={{ label: "Beta", tone: "info" }}
           actions={
             <>
-              <Button variant="outline" size="default">
+              <Button variant="outline" size="default" onClick={() => router.push("/dashboard/reports")}>
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 Ver reportes
               </Button>
-              <Button size="default">
+              <Button size="default" onClick={() => router.push("/dashboard/customers")}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 {t.customers.workspace.createButton}
               </Button>
@@ -205,17 +206,11 @@ export default function DashboardPage() {
                 className="mb-4"
               />
               <EmptyState
-                icon={Sparkles}
-                title={D.emptyTitle}
-                description={D.emptyDesc}
-                variant="minimal"
-                action={
-                  <Button>
-                    <TrendingUp className="h-4 w-4" aria-hidden="true" />
-                    Explorar roadmap
-                  </Button>
-                }
-              />
+                  icon={Sparkles}
+                  title={D.emptyTitle}
+                  description={D.emptyDesc}
+                  variant="minimal"
+                />
             </CardContent>
           </Card>
         </div>

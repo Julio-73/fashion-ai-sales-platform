@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Search, SlidersHorizontal, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { t } from "@/lib/i18n";
 import { DataTable } from "@/components/data-table/data-table";
@@ -37,18 +37,7 @@ export function CustomersCrmWorkspace() {
   const limit = 10;
   const activeRef = useRef(true);
 
-  useEffect(() => {
-    if (!accessToken) return;
-    activeRef.current = true;
-
-    loadCustomers();
-
-    return () => {
-      activeRef.current = false;
-    };
-  }, [accessToken, leadStatus, offset, search]);
-
-  async function loadCustomers(retried = false) {
+  const loadCustomers = useCallback(async (retried = false) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -82,7 +71,14 @@ export function CustomersCrmWorkspace() {
     } finally {
       if (activeRef.current) setIsLoading(false);
     }
-  }
+  }, [accessToken, leadStatus, offset, search, refreshSession]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    activeRef.current = true;
+    loadCustomers();
+    return () => { activeRef.current = false; };
+  }, [accessToken, leadStatus, offset, search, loadCustomers]);
 
   const tableRows = useMemo(
     () =>

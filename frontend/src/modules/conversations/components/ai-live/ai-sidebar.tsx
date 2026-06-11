@@ -44,7 +44,7 @@ export function AISidebar({ conversationId, onSelectSuggestedReply }: AISidebarP
     return () => { activeRef.current = false; };
   }, [accessToken]);
 
-  async function fetchWithRetry<T>(
+  const fetchWithRetry = useCallback(async function fetchWithRetry<T>(
     fetcher: (token: string) => Promise<T>,
     setData: (data: T) => void,
     setLoading: (v: boolean) => void,
@@ -77,7 +77,7 @@ export function AISidebar({ conversationId, onSelectSuggestedReply }: AISidebarP
     } finally {
       if (activeRef.current) setLoading(false);
     }
-  }
+  }, [accessToken, refreshSession]);
 
   const loadState = useCallback(() => {
     if (!conversationId) return;
@@ -91,7 +91,7 @@ export function AISidebar({ conversationId, onSelectSuggestedReply }: AISidebarP
       setAiState,
       setLoadingState, setErrorState, "Failed to load AI state"
     );
-  }, [conversationId, accessToken, refreshSession]);
+  }, [conversationId, accessToken, fetchWithRetry]);
 
   const loadSuggestedReplies = useCallback(() => {
     if (!conversationId) return;
@@ -105,7 +105,7 @@ export function AISidebar({ conversationId, onSelectSuggestedReply }: AISidebarP
       setSuggestedReplies,
       setLoadingReplies, setErrorReplies, "Failed to load suggestions"
     );
-  }, [conversationId, accessToken, refreshSession]);
+  }, [conversationId, accessToken, fetchWithRetry]);
 
   useEffect(() => {
     if (conversationId && tokenReady) {

@@ -40,7 +40,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm anim-fade-in" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl shadow-slate-950/20 focus:outline-none anim-scale-in",
+            "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-card text-card-foreground shadow-2xl shadow-slate-950/20 focus:outline-none anim-scale-in",
             sizeMap[size]
           )}
         >
@@ -62,7 +62,7 @@ export function Modal({
               </Button>
             </Dialog.Close>
           </div>
-          <div className="px-6 py-5">{children}</div>
+          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
           {footer ? (
             <div className="flex items-center justify-end gap-2 border-t bg-secondary/30 px-6 py-3">
               {footer}

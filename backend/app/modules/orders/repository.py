@@ -115,7 +115,8 @@ class OrderRepository:
         result = await self._session.execute(
             select(func.count()).select_from(Order).where(Order.empresa_id == empresa_id)
         )
-        return int(result.scalar_one()) + 1
+        scalar = await result.scalar_one()
+        return int(scalar) + 1
 
     async def commit(self) -> None:
         await self._session.commit()

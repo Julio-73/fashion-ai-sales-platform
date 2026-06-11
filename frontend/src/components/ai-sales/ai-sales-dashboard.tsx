@@ -41,7 +41,7 @@ export function AiSalesDashboard() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [errorProfile, setErrorProfile] = useState<string | null>(null);
 
-  async function fetchWithRetry<T>(
+  const fetchWithRetry = useCallback(async function fetchWithRetry<T>(
     fetcher: (token: string) => Promise<T>,
     setData: (data: T) => void,
     setLoading: (v: boolean) => void,
@@ -65,7 +65,7 @@ export function AiSalesDashboard() {
     } finally {
       if (activeRef.current) setLoading(false);
     }
-  }
+  }, [accessToken, refreshSession]);
 
   const loadAll = useCallback(() => {
     fetchWithRetry(
@@ -84,7 +84,7 @@ export function AiSalesDashboard() {
       (t) => import("@/services/sales.service").then((m) => m.getSalesActivity(t, 20)),
       setActivity, setLoadingActivity, setErrorActivity, S_ERRORS.loadActivity
     );
-  }, [accessToken, refreshSession]);
+  }, [fetchWithRetry]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -101,7 +101,7 @@ export function AiSalesDashboard() {
       (t) => import("@/services/sales.service").then((m) => m.getCustomerSalesProfile(t, customerId)),
       setProfile, setLoadingProfile, setErrorProfile, S_ERRORS.loadProfile
     );
-  }, [accessToken, refreshSession]);
+  }, [fetchWithRetry]);
 
   const intents = insights?.most_detected_intents ?? [];
 

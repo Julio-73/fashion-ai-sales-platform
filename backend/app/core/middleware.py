@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.log_formatters import request_id_var
 from app.core.redis import get_redis
 
 
@@ -71,7 +72,9 @@ def register_middleware(app: FastAPI) -> None:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         request_id = request.headers.get("x-request-id", str(uuid4()))
+        token = request_id_var.set(request_id)
         response = await call_next(request)
+        request_id_var.reset(token)
         response.headers["x-request-id"] = request_id
         response.headers["x-content-type-options"] = "nosniff"
         response.headers["x-frame-options"] = "DENY"

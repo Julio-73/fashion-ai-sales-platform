@@ -85,7 +85,7 @@ export function ProductCatalogWorkspace() {
     return () => {
       isActive = false;
     };
-  }, [accessToken, statusFilter, offset, search]);
+  }, [accessToken, statusFilter, offset, search, refreshSession]);
 
   const tableRows = useMemo(
     () =>

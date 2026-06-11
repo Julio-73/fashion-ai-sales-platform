@@ -99,7 +99,7 @@ function AuditBody() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
         <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b bg-secondary/70 text-left text-xs uppercase text-muted-foreground">
             <tr>

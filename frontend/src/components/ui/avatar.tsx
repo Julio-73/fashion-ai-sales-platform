@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type AvatarProps = {
@@ -70,11 +71,12 @@ export function Avatar({
       title={name}
     >
       {src ? (
-        <img
+        <Image
           src={src}
           alt={name}
-          className="h-full w-full object-cover"
-          loading="lazy"
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 50px"
         />
       ) : (
         <span>{getInitials(name)}</span>

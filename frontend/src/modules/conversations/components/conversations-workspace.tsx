@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { t } from "@/lib/i18n";
 import { DataTable } from "@/components/data-table/data-table";
@@ -130,18 +130,7 @@ export function ConversationsWorkspace() {
   const limit = 10;
   const activeRef = useRef(true);
 
-  useEffect(() => {
-    if (!accessToken) return;
-    activeRef.current = true;
-
-    loadConversations();
-
-    return () => {
-      activeRef.current = false;
-    };
-  }, [accessToken, estado, offset, search, refreshKey]);
-
-  async function loadConversations(retried = false) {
+  const loadConversations = useCallback(async (retried = false) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -174,7 +163,14 @@ export function ConversationsWorkspace() {
     } finally {
       if (activeRef.current) setIsLoading(false);
     }
-  }
+  }, [accessToken, estado, offset, search, refreshSession]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    activeRef.current = true;
+    loadConversations();
+    return () => { activeRef.current = false; };
+  }, [accessToken, estado, offset, search, refreshKey, loadConversations]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -210,7 +206,7 @@ export function ConversationsWorkspace() {
         typingPollRef.current = null;
       }
     };
-  }, [isAiTyping, accessToken, selected?.id]);
+  }, [isAiTyping, accessToken, selected]);
 
   async function openConversation(conv: ConversationSummary) {
     if (!accessToken) return;
@@ -510,7 +506,7 @@ export function ConversationsWorkspace() {
                   </StatusPill>
                 </p>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={closeDetail}>
+              <Button type="button" variant="ghost" size="icon" onClick={closeDetail} aria-label="Cerrar conversaci&oacute;n">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -559,6 +555,7 @@ export function ConversationsWorkspace() {
                     size="icon"
                     disabled={!newMessage.trim() || isSending}
                     onClick={handleSend}
+                    aria-label="Enviar mensaje"
                   >
                     <Send className="h-4 w-4" />
                   </Button>

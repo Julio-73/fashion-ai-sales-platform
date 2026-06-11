@@ -85,6 +85,10 @@ export function Topbar({
             size="icon-sm"
             className="hidden md:inline-flex"
             aria-label="Ayuda"
+            onClick={() => {
+              const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
+              document.dispatchEvent(event);
+            }}
           >
             <HelpCircle className="h-4 w-4" aria-hidden="true" />
           </Button>
@@ -109,12 +113,9 @@ export function Topbar({
             size="icon-sm"
             className="relative"
             aria-label={T.notifications}
+            disabled
           >
             <Bell className="h-4 w-4" aria-hidden="true" />
-            <span
-              aria-hidden="true"
-              className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-destructive ring-2 ring-background"
-            />
           </Button>
           <div className="ml-1 flex items-center gap-2 rounded-full border bg-card py-0.5 pl-0.5 pr-2.5">
             <Avatar name={T.avatarInitials} size="sm" />

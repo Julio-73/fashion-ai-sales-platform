@@ -180,6 +180,7 @@ export function ProductDetailPanel({
             <div className="grid grid-cols-3 gap-2">
               {product.images.map((image) => (
                 <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={image.image_url}
                     alt=""

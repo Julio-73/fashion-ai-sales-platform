@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDays, PackageCheck, Search, Truck, WalletCards } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DashboardSection } from "@/components/layout/dashboard-section";
@@ -71,16 +71,7 @@ export function OrdersWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const activeRef = useRef(true);
 
-  useEffect(() => {
-    if (!accessToken) return;
-    activeRef.current = true;
-    loadOrders();
-    return () => {
-      activeRef.current = false;
-    };
-  }, [accessToken, status, customer, dateFrom, dateTo, offset]);
-
-  async function loadOrders(retried = false) {
+  const loadOrders = useCallback(async (retried = false) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -115,13 +106,20 @@ export function OrdersWorkspace() {
     } finally {
       if (activeRef.current) setIsLoading(false);
     }
-  }
+  }, [accessToken, status, customer, dateFrom, dateTo, offset, refreshSession]);
 
-  async function handleStatusChange(orderId: string, nextStatus: OrderStatus) {
+  useEffect(() => {
+    if (!accessToken) return;
+    activeRef.current = true;
+    loadOrders();
+    return () => { activeRef.current = false; };
+  }, [accessToken, status, customer, dateFrom, dateTo, offset, loadOrders]);
+
+  const handleStatusChange = useCallback(async (orderId: string, nextStatus: OrderStatus) => {
     if (!accessToken) return;
     const updated = await updateOrderStatus(accessToken, orderId, nextStatus);
     setOrders((current) => current.map((order) => (order.id === orderId ? updated : order)));
-  }
+  }, [accessToken]);
 
   const rows = useMemo(
     () =>
@@ -163,7 +161,7 @@ export function OrdersWorkspace() {
           </div>
         ),
       })),
-    [orders],
+    [orders, handleStatusChange],
   );
 
   return (

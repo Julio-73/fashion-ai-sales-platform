@@ -4,12 +4,20 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.config import get_settings
+from app.core.config import get_settings, get_db_pool_settings
 
 logger = logging.getLogger("ai_sales_agent.database")
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+pool = get_db_pool_settings()
+engine = create_async_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_size=pool.db_pool_size,
+    max_overflow=pool.db_max_overflow,
+    pool_timeout=pool.db_pool_timeout,
+    pool_recycle=pool.db_pool_recycle,
+)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
