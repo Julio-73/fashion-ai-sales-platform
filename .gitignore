@@ -14,4 +14,9 @@ out/
 dist/
 coverage/
 *.log
+*.db
+*.pdf
+*.xlsx
+tmp_*
+*.egg-info/
 .DS_Store

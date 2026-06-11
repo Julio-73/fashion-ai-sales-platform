@@ -53,8 +53,7 @@ Write-Host ""
 Write-OK "=== Todo listo ==="
 Write-Info "Backend:   http://localhost:$BackendPort"
 Write-Info "Frontend:  http://localhost:$FrontendPort"
-Write-Info "Login:     demo@fashionsales.ai / Demo@2024!"
-Write-Info "Auto-Login: http://localhost:$FrontendPort/auto-login"
+Write-Info "Login:     usa las credenciales configuradas en .env (admin@tenant.com / Admin123!)"
 Write-Host ""
 Write-Host "Para detener: Get-Process | Where-Object { \$_.Id -in @($($be.Id), $($fe.Id)) } | Stop-Process" -ForegroundColor Gray
 Write-Host "O usa: taskkill /F /PID $($be.Id) & taskkill /F /PID $($fe.Id)" -ForegroundColor Gray
